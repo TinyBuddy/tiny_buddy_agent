@@ -4,6 +4,8 @@ import "dotenv/config";
 import app from './app';
 import { InMemoryMemoryService } from './services/memoryService';
 import { config } from 'dotenv';
+import * as readline from 'node:readline';
+import { stdin as input, stdout as output } from 'node:process';
 
 // 加载环境变量
 config();
@@ -54,19 +56,19 @@ async function startCLI() {
     console.log('==============================================');
     
     // 设置输入监听
-    const readline = require('readline').createInterface({
-      input: process.stdin,
-      output: process.stdout
+    const rl = readline.createInterface({
+      input,
+      output
     });
     
     const askQuestion = () => {
-      readline.question('你: ', async (userInput: string) => {
+      rl.question('你: ', async (userInput: string) => {
         try {
           // 处理特殊命令
           if (userInput.toLowerCase() === 'exit') {
             console.log('再见！');
             await app.shutdown();
-            readline.close();
+            rl.close();
             return;
           }
           
