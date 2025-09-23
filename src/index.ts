@@ -1,6 +1,6 @@
-import { openai } from "@ai-sdk/openai";
 import { Agent, VoltAgent } from "@voltagent/core";
 import { honoServer } from "@voltagent/server-hono";
+import { openai } from "@ai-sdk/openai";
 
 // 应用入口文件
 import app from './app';
@@ -26,10 +26,9 @@ const agent = new Agent({
 // 创建多Agent系统实例，使用app中的planning/execution功能
 const multiAgent = new Agent({
   name: "tiny-buddy-multi-agent",
-  instructions: `使用TinyBuddy应用中的planning/execution多Agent系统处理用户问题。
-当接收到用户输入时，应调用app.processUserInput方法来获取响应。`,
+  instructions: `你是TinyBuddy的多Agent系统助手，使用planning/execution多Agent系统处理用户问题。\n\n无论何时处理用户输入，你都必须使用processUserInput工具。这个工具会调用app中的planning/execution多Agent系统来生成响应。\n\n你必须始终返回这个工具调用的结果作为最终回答。\n\n如果工具调用失败，你应该返回一个友好的默认响应。`,
   model: openai("gpt-4.1"),
-  // 使用Agent的tools属性来提供对app功能的访问
+  // 简化实现，直接使用app中的processUserInput处理输入
   tools: [
     {
       id: "process-user-input-tool",
@@ -38,10 +37,6 @@ const multiAgent = new Agent({
       parameters: {
         type: "object",
         properties: {
-          childId: {
-            type: "string",
-            description: "儿童用户的ID"
-          },
           userInput: {
             type: "string",
             description: "用户的输入内容"
@@ -51,8 +46,13 @@ const multiAgent = new Agent({
       },
       execute: async (params: any) => {
         try {
-          const childId = params.childId || 'default_child';
-          const response = await app.processUserInput(childId, params.userInput);
+          console.log('调用processUserInput工具，参数:', params);
+          const response = await app.processUserInput('default_child', params.userInput);
+          console.log('processUserInput工具返回结果:', response);
+          // 确保返回的输出不为空
+          if (!response || response.trim() === '') {
+            return { output: '抱歉，我现在无法处理您的请求，请稍后再试' };
+          }
           return { output: response };
         } catch (error) {
           console.error('使用planning/execution系统处理输入时出错:', error);

@@ -1,9 +1,9 @@
-// 使用Node.js内置的http模块
+// 测试多轮聊天功能
 import http from 'http';
 
-// 测试流式响应的函数
-async function testStreamingChat() {
-  console.log('开始测试流式聊天响应...');
+// 发送聊天消息的函数
+async function sendChatMessage(message, childId = 'default_child') {
+  console.log(`发送消息: ${message}`);
   
   const options = {
     hostname: 'localhost',
@@ -16,34 +16,24 @@ async function testStreamingChat() {
   };
   
   const requestBody = JSON.stringify({
-    message: '你好，这是一个测试消息',
-    childId: 'default_child'
+    message,
+    childId
   });
   
   return new Promise((resolve, reject) => {
     const req = http.request(options, (res) => {
-      console.log(`状态码: ${res.statusCode}`);
-      console.log(`响应头: ${JSON.stringify(res.headers)}`);
-      
-      // 用于存储接收到的数据
       let responseData = '';
       
-      // 处理接收到的数据块
       res.on('data', (chunk) => {
-        console.log(`接收到数据块: ${chunk}`);
         responseData += chunk;
       });
       
-      // 响应结束时处理
       res.on('end', () => {
-        console.log('响应已完成');
-        
-        // 解析SSE格式的响应
         try {
           // 移除data:前缀和最后的换行符
           const cleanData = responseData.replace(/^data: /, '').trim();
           const parsedResponse = JSON.parse(cleanData);
-          console.log('解析后的响应:', parsedResponse);
+          console.log(`收到响应: ${parsedResponse.data?.message || '无响应内容'}`);
           resolve(parsedResponse);
         } catch (error) {
           console.error('解析响应失败:', error);
@@ -52,42 +42,24 @@ async function testStreamingChat() {
       });
     });
     
-    // 处理请求错误
     req.on('error', (error) => {
       console.error('请求错误:', error);
       reject(error);
     });
     
-    // 发送请求体
     req.write(requestBody);
     req.end();
   });
 }
 
-// 运行测试
-async function runTest() {
-  try {
-    console.log('正在连接到聊天服务...');
-    const result = await testStreamingChat();
-    
-    // 测试对话历史
-    await new Promise(resolve => setTimeout(resolve, 1000)); // 等待1秒确保历史记录已保存
-    await getConversationHistory();
-    
-    console.log('测试完成！');
-  } catch (error) {
-    console.error('测试失败:', error);
-  }
-}
-
 // 获取对话历史的函数
-async function getConversationHistory() {
+async function getConversationHistory(childId = 'default_child') {
   console.log('\n获取对话历史...');
   
   const options = {
     hostname: 'localhost',
     port: 3142,
-    path: '/api/history?childId=default_child',
+    path: `/api/history?childId=${childId}`,
     method: 'GET'
   };
   
@@ -105,7 +77,10 @@ async function getConversationHistory() {
           console.log('对话历史获取成功');
           console.log(`历史记录中消息数量: ${history.data?.length || 0}`);
           if (history.data && history.data.length > 0) {
-            console.log('最后一条消息:', history.data[history.data.length - 1]);
+            console.log('所有历史消息:');
+            history.data.forEach((msg, index) => {
+              console.log(`${index + 1}. [${msg.type}] ${msg.content}`);
+            });
           }
           resolve(history);
         } catch (error) {
@@ -124,5 +99,28 @@ async function getConversationHistory() {
   });
 }
 
+// 运行多轮测试
+async function runMultiTurnTest() {
+  try {
+    console.log('开始多轮聊天测试...');
+    console.log('测试场景: 先打招呼，然后表达想做游戏的意愿\n');
+    
+    // 发送第一条消息：打招呼
+    await sendChatMessage('你好，TinyBuddy！');
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
+    
+    // 发送第二条消息：表达想做游戏的意愿
+    await sendChatMessage('我想做游戏');
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
+    
+    // 获取并显示对话历史
+    await getConversationHistory();
+    
+    console.log('\n多轮聊天测试完成！');
+  } catch (error) {
+    console.error('测试失败:', error);
+  }
+}
+
 // 执行测试
-runTest();
+runMultiTurnTest();
