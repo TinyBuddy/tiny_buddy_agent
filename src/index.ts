@@ -1,4 +1,6 @@
-import "dotenv/config";
+import { Agent, VoltAgent } from "@voltagent/core";
+import { honoServer } from "@voltagent/server-hono";
+import { openai } from "@ai-sdk/openai";
 
 // 应用入口文件
 import app from './app';
@@ -14,11 +16,64 @@ console.log('环境变量 NODE_ENV:', process.env.NODE_ENV);
 console.log('环境变量 DEVELOPMENT_MODE:', process.env.DEVELOPMENT_MODE);
 console.log('应用入口文件已加载');
 
-// 启动API服务器
+// 创建标准Agent实例
+const agent = new Agent({
+  name: "tiny-buddy-agent",
+  instructions: "一个智能助手，可以回答问题",
+  model: openai(process.env.OPENAI_API_KEY || "gpt-4.1"),
+});
+
+// 创建多Agent系统实例，使用app中的planning/execution功能
+const multiAgent = new Agent({
+  name: "tiny-buddy-multi-agent",
+  instructions: "使用多Agent系统（planning/execution）处理用户问题",
+  // 为了符合Agent类的要求，提供一个model
+  model: openai(process.env.OPENAI_API_KEY || "gpt-4.1"),
+  // 在handle函数中使用app的多Agent功能处理实际业务
+  // 假设AgentOptions类型没有handle属性，可能需要通过扩展接口或使用any来绕过类型检查
+  // 此处使用类型断言来绕过类型检查
+  handle: async (input: any) => {
+
+
+    try {
+      const defaultChildId = 'default_child';
+      // 使用app的processUserInput方法处理输入
+      // 这里为了在VoltAgent中能立即得到响应，使用非流式版本
+      const response = await app.processUserInput(defaultChildId, input);
+      return response;
+    } catch (error) {
+      console.error('多Agent处理出错:', error);
+      return '抱歉，多Agent系统现在遇到了一些问题，请稍后再试';
+    }
+  },
+});
+
+// 启动应用和服务器
 async function startApplication() {
   try {
     console.log('开始启动TinyBuddy应用...');
+    
+    // 初始化主应用
+    await app.init();
+    
+    // 启动API服务器（使用默认端口3142，在server.ts中已配置）
     await startServer();
+    
+    // 初始化VoltAgent，配置端口3141作为VoltAgent远程控制台
+    new VoltAgent({
+      agents: { 
+        agent, // 标准Agent
+        multiAgent // 多Agent系统（planning/execution）
+      },
+      server: honoServer({
+        port: 3141
+      }),
+    });
+    console.log('VoltAgent远程控制台已启动，端口3141');
+    console.log('可用Agent列表：');
+    console.log('  - tiny-buddy-agent: 标准智能助手');
+    console.log('  - tiny-buddy-multi-agent: 使用planning/execution多Agent系统的助手');
+    
     console.log('TinyBuddy应用已成功启动');
   } catch (error) {
     console.error('应用启动失败:', error);

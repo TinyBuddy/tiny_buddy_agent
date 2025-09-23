@@ -21,18 +21,6 @@ const chatRequestSchema = z.object({
 // 创建默认儿童ID（与app.ts保持一致）
 const DEFAULT_CHILD_ID = 'default_child';
 
-// 初始化应用函数
-const initializeApp = async () => {
-  try {
-    console.log('正在初始化TinyBuddy API服务...');
-    await app.init();
-    console.log('TinyBuddy API服务初始化完成！');
-  } catch (error) {
-    console.error('TinyBuddy API服务初始化失败:', error);
-    process.exit(1);
-  }
-};
-
 // API端点定义
 
 // 1. 健康检查端点
@@ -246,11 +234,8 @@ apiApp.get('/api/interests/:childId?', async (c) => {
 
 // 启动服务器函数
 export const startServer = async () => {
-  // 初始化应用
-  await initializeApp();
-  
-  // 定义服务器端口
-  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3141;
+  // 定义服务器端口，默认使用3142
+  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3142;
   
   // 启动服务器
   const server = serve({
