@@ -1,251 +1,193 @@
 <div align="center">
-  <h1>⚡ tiny_buddy_agent</h1>
-  <p>AI Agent powered by <a href="https://voltagent.dev">VoltAgent</a></p>
+  <h1>🐻 TinyBuddy 儿童智能陪伴助手</h1>
+  <p>专为儿童设计的智能陪伴与教育AI助手</p>
   
   <p>
-    <a href="https://github.com/voltagent/voltagent"><img src="https://img.shields.io/badge/built%20with-VoltAgent-blue" alt="Built with VoltAgent" /></a>
-    <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D22-brightgreen" alt="Node Version" /></a>
+    <a href="https://github.com/TinyBuddy/tiny_buddy_agent"><img src="https://img.shields.io/badge/GitHub-TinyBuddy-blue" alt="GitHub Repository" /></a>
+    <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen" alt="Node Version" /></a>
+    <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/typescript-%5E5.0-blue" alt="TypeScript" /></a>
   </p>
 </div>
 
-## 🚀 Quick Start
+## 📚 项目介绍
 
-### Prerequisites
+TinyBuddy是一款专为儿童设计的智能陪伴助手，旨在提供安全、有趣且富有教育意义的互动体验。通过先进的AI技术，TinyBuddy能够根据儿童的年龄、兴趣和学习进度，提供个性化的陪伴和教育内容。
+
+## 🚀 快速开始
+
+### 前提条件
 
 - Node.js 20+ 
 - Git
-- OpenAI API Key (optional - can configure later)
-  - Get your key at: https://platform.openai.com/api-keys
+- OpenAI API Key（可选，可稍后配置）
+  - 在[OpenAI平台](https://platform.openai.com/api-keys)获取您的API密钥
 
-### Installation
+### 安装
 
 ```bash
-# Clone the repository (if not created via create-voltagent-app)
-git clone <your-repo-url>
+# 克隆仓库
+git clone https://github.com/TinyBuddy/tiny_buddy_agent.git
 cd tiny_buddy_agent
 
-# Install dependencies
+# 安装依赖
 npm install
 
-# Copy environment variables
+# 复制环境变量文件
 cp .env.example .env
 ```
 
-### Configuration
+### 配置
 
-Edit `.env` file with your API keys:
+编辑`.env`文件添加您的API密钥：
 
 ```env
 OPENAI_API_KEY=your-api-key-here
-
-# VoltOps Platform (Optional)
-# Get your keys at https://console.voltagent.dev/tracing-setup
-# VOLTAGENT_PUBLIC_KEY=your-public-key
-# VOLTAGENT_SECRET_KEY=your-secret-key
 ```
 
-### Running the Application
+### 运行应用
 
 ```bash
-# Development mode (with hot reload)
+# 开发模式
 npm run dev
 
-# Production build
+# 生产构建
 npm run build
 
-# Start production server
+# 启动生产服务器
 npm start
 ```
 
-## 🎯 Features
+## 🎯 核心功能
 
-This VoltAgent application includes:
+- **个性化交互**：基于儿童的年龄、兴趣和学习进度提供定制化回应
+- **儿童档案管理**：存储和管理儿童的基本信息、兴趣爱好和学习记录
+- **对话历史记录**：保存和回顾与儿童的对话内容
+- **学习进度跟踪**：记录和分析儿童在各知识点上的学习进展
+- **双Agent架构**：使用规划Agent和执行Agent协同工作，提供更智能的回应
+- **命令行交互界面**：简单易用的终端交互方式
 
-- **AI Agent**: Powered by OpenAI (GPT-4o-mini)
-- **Workflows**: Pre-configured expense approval workflow
-- **Memory**: Built-in conversation history
-- **Tools**: Extensible tool system
-- **Type Safety**: Full TypeScript support
+## 🛠️ 项目架构
 
-## 🔍 VoltOps Platform
+TinyBuddy采用模块化的架构设计，包含以下主要组件：
 
-### Local Development
-The VoltOps Platform provides real-time observability for your agents during development:
+- **应用核心**：`TinyBuddyApp`类管理整个应用的生命周期和服务
+- **Actor系统**：包括规划Agent和执行Agent，负责处理用户输入和生成响应
+- **记忆服务**：管理儿童档案、对话历史和学习进度
+- **知识库服务**：存储和检索教育内容和互动素材
 
-1. **Start your agent**: Run `npm run dev`
-2. **Open console**: Visit [console.voltagent.dev](https://console.voltagent.dev)
-3. **Auto-connect**: The console connects to your local agent at `http://localhost:3141`
-
-Features:
-- 🔍 Real-time execution visualization
-- 🐛 Step-by-step debugging
-- 📊 Performance insights
-- 💾 No data leaves your machine
-
-### Production Monitoring
-For production environments, configure VoltOpsClient:
-
-1. **Create a project**: Sign up at [console.voltagent.dev/tracing-setup](https://console.voltagent.dev/tracing-setup)
-2. **Get your keys**: Copy your Public and Secret keys
-3. **Add to .env**:
-   ```env
-   VOLTAGENT_PUBLIC_KEY=your-public-key
-   VOLTAGENT_SECRET_KEY=your-secret-key
-   ```
-4. **Configure in code**: The template already includes VoltOpsClient setup!
-
-## 📁 Project Structure
+## 📁 项目结构
 
 ```
 tiny_buddy_agent/
-├── src/
-│   ├── index.ts          # Main agent configuration
-│   ├── tools/            # Custom tools
-│   │   ├── index.ts      # Tool exports
-│   │   └── weather.ts    # Weather tool example
-│   └── workflows/        # Workflow definitions
-│       └── index.ts      # Expense approval workflow
-├── dist/                 # Compiled output (after build)
-├── .env                  # Environment variables
-├── .voltagent/           # Agent memory storage
-├── Dockerfile            # Production deployment
-├── package.json
-└── tsconfig.json
+├── src/                      # 源代码目录
+│   ├── actors/               # AI智能体实现
+│   │   ├── baseActor.ts      # 基础智能体类
+│   │   ├── executionAgent.ts # 执行智能体
+│   │   └── planningAgent.ts  # 规划智能体
+│   ├── app.ts                # 应用核心类
+│   ├── factories/            # 智能体工厂
+│   │   ├── actorManager.ts         # 智能体管理器
+│   │   ├── baseActorFactory.ts     # 基础智能体工厂
+│   │   ├── executionAgentFactory.ts # 执行智能体工厂
+│   │   └── planningAgentFactory.ts  # 规划智能体工厂
+│   ├── index.ts              # 应用入口文件
+│   ├── models/               # 数据模型
+│   │   ├── childProfile.ts   # 儿童档案模型
+│   │   ├── content.ts        # 内容模型
+│   │   └── message.ts        # 消息模型
+│   ├── services/             # 服务层
+│   │   ├── inMemoryKnowledgeBaseService.ts # 内存知识库服务
+│   │   ├── knowledgeBaseService.ts  # 知识库服务接口
+│   │   └── memoryService.ts  # 记忆服务
+│   ├── tools/                # 工具集合
+│   │   ├── index.ts          # 工具导出
+│   │   └── weather.ts        # 天气工具示例
+│   └── workflows/            # 工作流定义
+│       └── index.ts          # 工作流导出
+├── .env                      # 环境变量配置
+├── .gitignore                # Git忽略文件配置
+├── Dockerfile                # Docker部署配置
+├── package.json              # 项目依赖配置
+└── tsconfig.json             # TypeScript配置
 ```
 
-## 🧪 Testing Workflows
+## 💬 使用指南
 
-The included expense approval workflow has test scenarios:
-
-### Scenario 1: Auto-approved (< $500)
-```json
-{
-  "employeeId": "EMP-123",
-  "amount": 250,
-  "category": "office-supplies",
-  "description": "New laptop mouse and keyboard"
-}
-```
-
-### Scenario 2: Manager approval required ($500-$5000)
-```json
-{
-  "employeeId": "EMP-456",
-  "amount": 3500,
-  "category": "travel",
-  "description": "Conference registration and hotel"
-}
-```
-
-### Scenario 3: Director approval required (> $5000)
-```json
-{
-  "employeeId": "EMP-789",
-  "amount": 15000,
-  "category": "equipment",
-  "description": "New server hardware"
-}
-```
-
-## 🐳 Docker Deployment
-
-Build and run with Docker:
+启动应用后，您可以通过命令行界面与TinyBuddy进行交互：
 
 ```bash
-# Build image
+# 启动应用
+npm run dev
+
+# 应用启动后，可以直接在命令行中输入内容与TinyBuddy交流
+你: 你好，TinyBuddy！
+TinyBuddy正在思考...
+TinyBuddy: 你好呀，小朋友！今天过得怎么样？
+
+# 特殊命令
+你: clear    # 清空对话历史
+你: exit     # 退出程序
+```
+
+## 🐳 Docker部署
+
+可以使用Docker来容器化部署TinyBuddy：
+
+```bash
+# 构建Docker镜像
 docker build -t tiny_buddy_agent .
 
-# Run container
+# 运行Docker容器
 docker run -p 3141:3141 --env-file .env tiny_buddy_agent
-
-# Or use docker-compose
-docker-compose up
 ```
 
-## 🛠️ Development
+## 🧪 开发指南
 
-### Available Scripts
+### 可用脚本
 
-- `npm run dev` - Start development server with hot reload
-- `npm run build` - Build for production
-- `npm start` - Run production build
-- `npm run volt` - VoltAgent CLI tools
+- `npm run dev` - 启动开发服务器
+- `npm run build` - 构建生产版本
+- `npm start` - 运行生产版本
 
-### Adding Custom Tools
+### 扩展功能
 
-Create new tools in `src/tools/`:
+TinyBuddy的模块化设计使其易于扩展。您可以：
 
-```typescript
-import { createTool } from '@voltagent/core';
-import { z } from 'zod';
+1. **添加新工具**：在`src/tools/`目录下创建新的工具模块
+2. **扩展智能体能力**：修改`src/actors/`目录下的智能体实现
+3. **增强数据模型**：更新`src/models/`目录下的数据结构
 
-export const myTool = createTool({
-  name: 'myTool',
-  description: 'Description of what this tool does',
-  input: z.object({
-    param: z.string(),
-  }),
-  output: z.string(),
-  handler: async ({ param }) => {
-    // Tool logic here
-    return `Result: ${param}`;
-  },
-});
-```
+## 🔒 安全考虑
 
-### Creating New Workflows
+TinyBuddy专为儿童设计，我们特别注重以下安全方面：
 
-Add workflows in `src/workflows/`:
+- 不收集或存储敏感个人信息
+- 所有数据默认存储在本地内存中
+- 提供适合儿童的内容过滤机制
+- 简单易用的家长控制选项
 
-```typescript
-import { createWorkflowChain } from '@voltagent/core';
-import { z } from 'zod';
+## 🤝 贡献指南
 
-export const myWorkflow = createWorkflowChain({
-  id: "my-workflow",
-  name: "My Custom Workflow",
-  purpose: "Description of what this workflow does",
-  input: z.object({
-    data: z.string(),
-  }),
-  result: z.object({
-    output: z.string(),
-  }),
-})
-  .andThen({
-    id: "process-data",
-    execute: async ({ data }) => {
-      // Process the input
-      const processed = data.toUpperCase();
-      return { processed };
-    },
-  })
-  .andThen({
-    id: "final-step",
-    execute: async ({ data }) => {
-      // Final transformation
-      return { output: `Result: ${data.processed}` };
-    },
-  });
-```
+我们欢迎社区贡献！如果您有任何想法或改进，请：
 
-## 📚 Resources
+1. Fork项目仓库
+2. 创建您的功能分支
+3. 提交您的更改
+4. 推送到您的分支
+5. 提交Pull Request
 
-- **Documentation**: [voltagent.dev/docs](https://voltagent.dev/docs/)
-- **Examples**: [github.com/VoltAgent/voltagent/tree/main/examples](https://github.com/VoltAgent/voltagent/tree/main/examples)
-- **Discord**: [Join our community](https://s.voltagent.dev/discord)
-- **Blog**: [voltagent.dev/](https://voltagent.dev/blog/)
+## 📄 许可证
 
-## 🤝 Contributing
+本项目采用MIT许可证 - 详见LICENSE文件获取详细信息
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## 📧 联系我们
 
-## 📄 License
+如有任何问题或建议，请随时联系我们：
 
-MIT License - see LICENSE file for details
+- GitHub Issues: [提交问题](https://github.com/TinyBuddy/tiny_buddy_agent/issues)
 
 ---
 
 <div align="center">
-  <p>Built with ❤️ using <a href="https://voltagent.dev">VoltAgent</a></p>
+  <p>用❤️打造的儿童智能陪伴助手</p>
 </div>
