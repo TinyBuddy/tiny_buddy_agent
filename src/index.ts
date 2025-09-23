@@ -20,7 +20,10 @@ console.log('应用入口文件已加载');
 const agent = new Agent({
   name: "tiny-buddy-agent",
   instructions: "一个智能助手，可以回答问题",
-  model: openai(process.env.OPENAI_API_KEY || "gpt-4.1"),
+  model: openai({ 
+    apiKey: process.env.OPENAI_API_KEY,
+    model: "gpt-4o-mini" 
+  }),
 });
 
 // 创建多Agent系统实例，使用app中的planning/execution功能
@@ -28,24 +31,33 @@ const multiAgent = new Agent({
   name: "tiny-buddy-multi-agent",
   instructions: "使用多Agent系统（planning/execution）处理用户问题",
   // 为了符合Agent类的要求，提供一个model
-  model: openai(process.env.OPENAI_API_KEY || "gpt-4.1"),
+  model: openai({ 
+    apiKey: process.env.OPENAI_API_KEY,
+    model: "gpt-4o-mini" 
+  }),
   // 在handle函数中使用app的多Agent功能处理实际业务
-  // 假设AgentOptions类型没有handle属性，可能需要通过扩展接口或使用any来绕过类型检查
-  // 此处使用类型断言来绕过类型检查
+  // 注意：这里的input类型应该根据VoltAgent的要求来设置
+  // 定义handle函数来处理用户输入
   handle: async (input: any) => {
-
-
     try {
+      // 确保input是一个字符串或提取input中的文本内容
+      const userInput = typeof input === 'string' ? input : 
+                        input?.input ? input.input : 
+                        input?.message ? input.message : 
+                        input?.text ? input.text : 
+                        JSON.stringify(input);
+      
       const defaultChildId = 'default_child';
       // 使用app的processUserInput方法处理输入
-      // 这里为了在VoltAgent中能立即得到响应，使用非流式版本
-      const response = await app.processUserInput(defaultChildId, input);
-      return response;
+      const response = await app.processUserInput(defaultChildId, userInput);
+      
+      // 确保返回格式符合VoltAgent的要求
+      return { output: response };
     } catch (error) {
-      console.error('多Agent处理出错:', error);
-      return '抱歉，多Agent系统现在遇到了一些问题，请稍后再试';
-    }
-  },
+        console.error('多Agent处理出错:', error);
+        return { output: '抱歉，多Agent系统现在遇到了一些问题，请稍后再试' };
+      }
+    },
 });
 
 // 启动应用和服务器
