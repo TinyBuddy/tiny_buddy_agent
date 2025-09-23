@@ -4,6 +4,13 @@ import { KnowledgeContent } from '../models/content';
 import { Message } from '../models/message';
 import { openai } from '@ai-sdk/openai';
 import { generateText } from 'ai';
+import { config } from 'dotenv';
+
+// 加载环境变量
+config();
+
+// 开发模式标志
+const DEVELOPMENT_MODE = process.env.DEVELOPMENT_MODE === 'true';
 
 // 互动类型
 enum InteractionType {
@@ -51,7 +58,27 @@ export class PlanningAgent implements BaseActor {
 
   async process(input: {input: string; context: ActorContext; plan?: any}): Promise<{output: string; metadata?: Record<string, any>}> {
     try {
-      // 调用大模型生成规划
+      // 在开发模式下，直接使用模拟规划
+      if (DEVELOPMENT_MODE) {
+        console.log('开发模式: 使用模拟规划');
+        const mockPlan = this.createMockPlan(input.context);
+        this.lastPlan = mockPlan;
+        
+        // 根据计划生成返回信息
+        const response = this.generateResponse(mockPlan);
+        
+        return {
+          output: response,
+          metadata: {
+            interactionType: mockPlan.type,
+            contentId: mockPlan.contentId,
+            objectives: mockPlan.objectives,
+            developmentMode: true
+          }
+        };
+      }
+      
+      // 生产模式下，调用大模型生成规划
       const plan = await this.generatePlanWithLLM(input.context);
       this.lastPlan = plan;
       
@@ -82,6 +109,18 @@ export class PlanningAgent implements BaseActor {
         }
       };
     }
+  }
+  
+  // 创建开发模式下的模拟规划
+  private createMockPlan(context: ActorContext): PlanningResult {
+    const { childProfile } = context;
+    
+    // 简单的模拟规划逻辑
+    return {
+      type: InteractionType.CHAT,
+      objectives: ['建立情感连接', '鼓励表达'],
+      strategy: `以朋友的身份与${childProfile.name}聊天，使用简单易懂的语言，保持积极鼓励的语气。`
+    };
   }
 
   getState(): Record<string, any> {
