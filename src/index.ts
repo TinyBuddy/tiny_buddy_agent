@@ -3,6 +3,15 @@ import "dotenv/config";
 // 应用入口文件
 import app from './app';
 import { InMemoryMemoryService } from './services/memoryService';
+import { config } from 'dotenv';
+
+// 加载环境变量
+config();
+
+console.log('Node.js 版本:', process.version);
+console.log('环境变量 NODE_ENV:', process.env.NODE_ENV);
+console.log('环境变量 DEVELOPMENT_MODE:', process.env.DEVELOPMENT_MODE);
+console.log('应用入口文件已加载');
 
 // 扩展app接口以提供对服务的访问
 declare module './app' {
@@ -22,17 +31,23 @@ Object.defineProperty(app, 'getMemoryService', {
 
 // 简单的命令行接口
 async function startCLI() {
+  console.log('startCLI函数开始执行');
   try {
+    console.log('准备初始化应用');
     console.log('欢迎使用TinyBuddy儿童智能陪伴助手！');
     
     // 初始化应用
+    console.log('开始调用app.init()');
     await app.init();
+    console.log('app.init()调用完成');
     
     // 默认儿童ID
     const defaultChildId = 'default_child';
     
     // 获取儿童档案
+    console.log('开始调用app.getChildProfile()');
     const childProfile = await app.getChildProfile(defaultChildId);
+    console.log('app.getChildProfile()调用完成');
     console.log(`\n当前用户: ${childProfile.name} (${childProfile.age}岁)`);
     console.log('兴趣爱好:', childProfile.interests.join(', '));
     console.log('\n输入"exit"退出程序，输入"clear"清空对话历史');
@@ -88,7 +103,5 @@ async function startCLI() {
 // 导出应用实例和启动函数
 export { app, startCLI };
 
-// 如果直接运行此文件，则启动命令行接口
-if (import.meta.url === new URL(process.argv[1], import.meta.url).href) {
-  startCLI();
-}
+// 直接启动命令行接口
+startCLI();
