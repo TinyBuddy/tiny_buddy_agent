@@ -68,7 +68,7 @@ export class TinyBuddyApp {
     console.log('TinyBuddy应用初始化完成！');
   }
   
-  // 处理用户输入
+  // 处理用户输入（非流式版本）
   public async processUserInput(childId: string, userInput: string): Promise<string> {
     if (!this.isRunning) {
       throw new Error('应用尚未初始化，请先调用init()方法');
@@ -192,6 +192,130 @@ export class TinyBuddyApp {
     } catch (error) {
       console.error('处理用户输入时出错:', error);
       return '抱歉，我现在遇到了一些问题，请稍后再试';
+    }
+  }
+  
+  // 处理用户输入（流式版本）
+  public async processUserInputWithStreaming(
+    childId: string, 
+    userInput: string, 
+    onProgress: (content: string) => void
+  ): Promise<string> {
+    if (!this.isRunning) {
+      throw new Error('应用尚未初始化，请先调用init()方法');
+    }
+    
+    // 验证参数
+    if (!childId || typeof userInput !== 'string' || userInput.trim() === '') {
+      return '请输入有效的内容';
+    }
+    
+    try {
+      // 创建用户消息并添加到对话历史
+      const userMessage = createMessage({
+        type: 'user',
+        content: userInput,
+        sender: 'user',
+        recipient: 'tiny_buddy'
+      });
+      
+      await this.memoryService.addMessageToHistory(childId, userMessage);
+      
+      // 获取儿童档案和对话历史
+      const childProfile = await this.memoryService.getChildProfile(childId);
+      const conversationHistory = await this.memoryService.getConversationHistory(childId);
+      
+      // 创建Actor上下文
+      const knowledgeBase = await this.knowledgeBaseService.getAllContents();
+      const context = {
+        childProfile,
+        conversationHistory,
+        knowledgeBase
+      };
+      
+      // 获取或创建规划Agent
+      let planningAgent = this.actorManager.getActorsByType('planningAgent')[0];
+      if (!planningAgent) {
+        planningAgent = await this.actorManager.createActor('planningAgent', {
+          knowledgeBaseService: this.knowledgeBaseService,
+          memoryService: this.memoryService
+        });
+        await planningAgent.init?.(context);
+      }
+      
+      // 获取或创建执行Agent
+      let executionAgent = this.actorManager.getActorsByType('executionAgent')[0];
+      if (!executionAgent) {
+        executionAgent = await this.actorManager.createActor('executionAgent', {
+          knowledgeBaseService: this.knowledgeBaseService,
+          memoryService: this.memoryService
+        });
+        await executionAgent.init?.(context);
+      }
+      
+      // 创建一个Promise，用于等待实际响应的生成
+      const actualResponsePromise = new Promise<string>(async (resolve) => {
+        try {
+          // 规划Agent创建互动计划
+          const planResult = await planningAgent.process?.({
+            input: userMessage.content,
+            context
+          });
+          
+          // 执行Agent根据计划生成响应
+          const executionResult = await executionAgent.process?.({
+            input: userMessage.content,
+            context,
+            plan: planResult?.output || { type: 'chat', content: '默认响应计划' }
+          });
+          
+          const finalResponse = executionResult?.output || '抱歉，我现在遇到了一些问题，请稍后再试';
+          
+          // 创建最终响应消息
+          const finalMessage = createMessage({
+            type: 'system',
+            content: finalResponse,
+            sender: 'tiny_buddy',
+            recipient: 'user',
+            metadata: {
+              interactionType: executionResult?.metadata?.interactionType || 'chat',
+              isFinalResponse: true
+            }
+          });
+          
+          // 添加最终响应到对话历史
+          await this.memoryService.addMessageToHistory(childId, finalMessage);
+          
+          // 更新儿童档案的学习进度
+          if (executionResult?.metadata?.learningPoint) {
+            await this.memoryService.trackLearningProgress(
+              childId,
+              executionResult.metadata.learningPoint,
+              executionResult.metadata.progress || 10
+            );
+          }
+          
+          console.log(`生成最终响应: ${finalResponse}`);
+          
+          // 通知调用者有了最终响应
+          onProgress(finalResponse);
+          
+          resolve(finalResponse);
+        } catch (error) {
+          console.error('处理规划和执行时出错:', error);
+          const errorResponse = '抱歉，我现在遇到了一些问题，请稍后再试';
+          onProgress(errorResponse);
+          resolve(errorResponse);
+        }
+      });
+      
+      // 不需要返回默认响应，直接返回实际响应的Promise
+      return actualResponsePromise;
+    } catch (error) {
+      console.error('处理用户输入时出错:', error);
+      const errorResponse = '抱歉，我现在遇到了一些问题，请稍后再试';
+      onProgress(errorResponse);
+      return errorResponse;
     }
   }
   

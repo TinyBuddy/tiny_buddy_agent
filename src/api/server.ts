@@ -44,7 +44,7 @@ apiApp.get('/api/health', (c) => {
   });
 });
 
-// 2. 处理聊天消息端点
+// 2. 处理聊天消息端点（流式响应版本）
 apiApp.post('/api/chat', async (c) => {
   try {
     // 验证请求体
@@ -53,19 +53,54 @@ apiApp.post('/api/chat', async (c) => {
     
     console.log(`接收到来自儿童 ${childId} 的消息: ${message}`);
     
-    // 处理用户消息
-    const response = await app.processUserInput(childId, message);
+    // 设置流式响应的头部
+    c.header('Content-Type', 'text/event-stream');
+    c.header('Cache-Control', 'no-cache');
+    c.header('Connection', 'keep-alive');
     
-    console.log(`生成响应: ${response}`);
-    
-    return c.json({
-      success: true,
-      data: {
-        message: response,
-        childId,
-        timestamp: new Date().toISOString()
+    // 创建可写流
+    const stream = new ReadableStream({
+      async start(controller) {
+        // 定义回调函数来处理流式输出
+        const onProgress = (content: string) => {
+          try {
+            // 将内容作为事件流格式发送
+            const data = JSON.stringify({
+              success: true,
+              data: {
+                message: content,
+                childId,
+                timestamp: new Date().toISOString()
+              }
+            });
+            controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`));
+            
+            // 响应完成后关闭流
+            controller.close();
+          } catch (error) {
+            console.error('流式输出时出错:', error);
+            controller.error(error);
+          }
+        };
+        
+        try {
+          // 使用流式处理方法
+          await app.processUserInputWithStreaming(childId, message, onProgress);
+        } catch (error) {
+          console.error('处理用户输入时出错:', error);
+          const errorData = JSON.stringify({
+            success: false,
+            error: '服务器内部错误',
+            timestamp: new Date().toISOString()
+          });
+          controller.enqueue(new TextEncoder().encode(`data: ${errorData}\n\n`));
+          controller.close();
+        }
       }
     });
+    
+    // 返回流式响应
+    return c.body(stream);
   } catch (error) {
     console.error('处理聊天请求时出错:', error);
     
