@@ -90,16 +90,24 @@ export class ExecutionAgent implements BaseActor {
       }
       
       try {
-        // 构建初始响应提示词
-        const prompt = `你是TinyBuddy，一个儿童智能陪伴助手。现在需要向${input.context.childProfile.name}（${input.context.childProfile.age}岁）打个招呼，开始一段友好的对话。\n` +
-        `儿童的兴趣爱好是: ${input.context.childProfile.interests.join(', ')}\n` +
-        `请用简单、友好、活泼的语气，符合${input.context.childProfile.age}岁儿童的认知水平。\n` +
-        `当前互动类型: ${this.state.currentInteractionType || '聊天'}\n` +
-        `请直接回复打招呼的内容，不要包含任何额外信息。`;
+        // 构建更智能的响应提示词，考虑用户的输入内容
+        const prompt = `你是TinyBuddy，一个儿童智能陪伴助手，专门陪伴${input.context.childProfile.name}（${input.context.childProfile.age}岁）。
+` +
+        `儿童的兴趣爱好是: ${input.context.childProfile.interests.join(', ')}
+` +
+        `请用简单、友好、活泼的语气，符合${input.context.childProfile.age}岁儿童的认知水平。
+` +
+        `当前互动类型: ${this.state.currentInteractionType || '聊天'}
+` +
+        `用户刚才说: "${input.input}"
+` +
+        `如果用户表达了想做游戏的意愿，请立即回应游戏相关内容。
+` +
+        `请直接回复合适的内容，不要包含任何额外信息。`;
         
         // 调用大模型生成初始响应
         const result = await generateText({
-          model: openai(this.config.model || 'gpt-4o-mini'),
+          model: openai('gpt-4.1'),
           prompt,
           maxOutputTokens: 100,
           temperature: 0.7
@@ -216,7 +224,7 @@ export class ExecutionAgent implements BaseActor {
       
       // 调用大模型生成响应
       const result = await generateText({
-        model: openai(this.config.model || 'gpt-4o-mini'),
+        model: openai('gpt-4.1'),
         prompt,
         maxOutputTokens: 200,
         temperature: 0.7

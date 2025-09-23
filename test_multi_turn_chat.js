@@ -1,126 +1,269 @@
 // 测试多轮聊天功能
 import http from 'http';
 
-// 发送聊天消息的函数
-async function sendChatMessage(message, childId = 'default_child') {
-  console.log(`发送消息: ${message}`);
-  
-  const options = {
-    hostname: 'localhost',
-    port: 3142,
-    path: '/api/chat',
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  };
-  
-  const requestBody = JSON.stringify({
-    message,
-    childId
-  });
-  
+// 定义API服务器地址
+const API_URL = 'http://localhost:3142';
+const DEFAULT_CHILD_ID = 'default_child';
+
+/**
+ * 发送聊天消息到API
+ * @param {string} childId - 儿童ID
+ * @param {string} message - 聊天消息
+ * @returns {Promise<string>} - 服务器响应
+ */
+async function sendChatMessage(childId, message) {
   return new Promise((resolve, reject) => {
+    const data = JSON.stringify({
+      childId: childId,
+      message: message
+    });
+
+    const options = {
+      hostname: 'localhost',
+      port: 3142,
+      path: '/api/chat',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(data)
+      }
+    };
+
     const req = http.request(options, (res) => {
       let responseData = '';
-      
+
+      console.log(`发送消息 "${message}"，状态码: ${res.statusCode}`);
+
       res.on('data', (chunk) => {
         responseData += chunk;
       });
-      
+
       res.on('end', () => {
-        try {
-          // 移除data:前缀和最后的换行符
-          const cleanData = responseData.replace(/^data: /, '').trim();
-          const parsedResponse = JSON.parse(cleanData);
-          console.log(`收到响应: ${parsedResponse.data?.message || '无响应内容'}`);
-          resolve(parsedResponse);
-        } catch (error) {
-          console.error('解析响应失败:', error);
-          reject(error);
+        // 解析SSE响应格式
+        const events = responseData.split('\n\n');
+        for (const event of events) {
+          if (event.startsWith('data: ')) {
+            const jsonData = event.substring(6); // 去掉 'data: ' 前缀
+            try {
+              const parsedData = JSON.parse(jsonData);
+              console.log('收到响应:', parsedData.data.message);
+              resolve(parsedData.data.message);
+              return;
+            } catch (error) {
+              console.error('解析响应数据失败:', error);
+              reject(new Error('解析响应数据失败'));
+            }
+          }
         }
+        reject(new Error('未找到有效的响应数据'));
       });
     });
-    
+
     req.on('error', (error) => {
       console.error('请求错误:', error);
       reject(error);
     });
-    
-    req.write(requestBody);
+
+    req.write(data);
     req.end();
   });
 }
 
-// 获取对话历史的函数
-async function getConversationHistory(childId = 'default_child') {
-  console.log('\n获取对话历史...');
-  
-  const options = {
-    hostname: 'localhost',
-    port: 3142,
-    path: `/api/history?childId=${childId}`,
-    method: 'GET'
-  };
-  
+/**
+ * 获取对话历史
+ * @param {string} childId - 儿童ID
+ * @returns {Promise<Array>} - 对话历史
+ */
+async function getConversationHistory(childId) {
   return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'localhost',
+      port: 3142,
+      path: `/api/history/${childId}`,
+      method: 'GET'
+    };
+
     const req = http.request(options, (res) => {
-      let data = '';
-      
+      let responseData = '';
+
       res.on('data', (chunk) => {
-        data += chunk;
+        responseData += chunk;
       });
-      
+
       res.on('end', () => {
         try {
-          const history = JSON.parse(data);
-          console.log('对话历史获取成功');
-          console.log(`历史记录中消息数量: ${history.data?.length || 0}`);
-          if (history.data && history.data.length > 0) {
-            console.log('所有历史消息:');
-            history.data.forEach((msg, index) => {
-              console.log(`${index + 1}. [${msg.type}] ${msg.content}`);
-            });
-          }
-          resolve(history);
+          const parsedData = JSON.parse(responseData);
+          console.log('对话历史获取成功，消息数量:', parsedData.data.totalMessages);
+          console.log('完整历史响应:', JSON.stringify(parsedData, null, 2));
+          resolve(parsedData.data.history);
         } catch (error) {
           console.error('解析对话历史失败:', error);
-          reject(error);
+          console.error('原始响应数据:', responseData);
+          reject(new Error('解析对话历史失败'));
         }
       });
     });
-    
+
     req.on('error', (error) => {
-      console.error('获取对话历史出错:', error);
+      console.error('请求错误:', error);
       reject(error);
     });
-    
+
     req.end();
   });
 }
 
-// 运行多轮测试
-async function runMultiTurnTest() {
+/**
+ * 清空对话历史（测试前准备）
+ * @param {string} childId - 儿童ID
+ * @returns {Promise<void>}
+ */
+async function clearConversationHistory(childId) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'localhost',
+      port: 3142,
+      path: `/api/clear-history/${childId}`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    };
+
+    const req = http.request(options, (res) => {
+      let responseData = '';
+
+      res.on('data', (chunk) => {
+        responseData += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          const parsedData = JSON.parse(responseData);
+          console.log('对话历史已清空:', parsedData.message);
+          resolve();
+        } catch (error) {
+          console.error('清空对话历史失败:', error);
+          reject(new Error('清空对话历史失败'));
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error('请求错误:', error);
+      reject(error);
+    });
+
+    req.write(JSON.stringify({}));
+    req.end();
+  });
+}
+
+/**
+ * 获取儿童档案信息
+ * @param {string} childId - 儿童ID
+ * @returns {Promise<any>} - 儿童档案
+ */
+async function getChildProfile(childId) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'localhost',
+      port: 3142,
+      path: `/api/profile/${childId}`,
+      method: 'GET'
+    };
+
+    const req = http.request(options, (res) => {
+      let responseData = '';
+
+      res.on('data', (chunk) => {
+        responseData += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          const parsedData = JSON.parse(responseData);
+          console.log('儿童档案获取成功:', parsedData.data.profile.name);
+          resolve(parsedData.data.profile);
+        } catch (error) {
+          console.error('解析儿童档案失败:', error);
+          reject(new Error('解析儿童档案失败'));
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      console.error('请求错误:', error);
+      reject(error);
+    });
+
+    req.end();
+  });
+}
+
+/**
+ * 执行多轮聊天测试（游戏场景）
+ */
+async function runGameScenarioTest() {
+  const childId = DEFAULT_CHILD_ID;
+
   try {
-    console.log('开始多轮聊天测试...');
-    console.log('测试场景: 先打招呼，然后表达想做游戏的意愿\n');
+    console.log('===== 游戏场景多轮聊天测试开始 =====');
     
-    // 发送第一条消息：打招呼
-    await sendChatMessage('你好，TinyBuddy！');
-    await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
+    // 1. 清空对话历史，确保测试环境干净
+    console.log('\n清空对话历史...');
+    await clearConversationHistory(childId);
     
-    // 发送第二条消息：表达想做游戏的意愿
-    await sendChatMessage('我想做游戏');
-    await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
+    // 2. 获取儿童档案信息
+    console.log('\n获取儿童档案信息...');
+    const childProfile = await getChildProfile(childId);
     
-    // 获取并显示对话历史
-    await getConversationHistory();
+    // 3. 第一轮对话：打招呼
+    console.log('\n===== 第一轮对话 =====');
+    console.log('发送消息: "你好，TinyBuddy！"');
+    const response1 = await sendChatMessage(childId, '你好，TinyBuddy！');
+    console.log('响应:', response1);
     
-    console.log('\n多轮聊天测试完成！');
+    // 等待片刻
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // 4. 第二轮对话：表达想做游戏的意愿
+    console.log('\n===== 第二轮对话 =====');
+    console.log('发送消息: "我想做游戏"');
+    const response2 = await sendChatMessage(childId, '我想做游戏');
+    console.log('响应:', response2);
+    
+    // 等待片刻
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // 5. 第三轮对话：具体游戏建议
+    console.log('\n===== 第三轮对话 =====');
+    console.log('发送消息: "我们来玩猜谜语的游戏吧！"');
+    const response3 = await sendChatMessage(childId, '我们来玩猜谜语的游戏吧！');
+    console.log('响应:', response3);
+    
+    // 等待片刻
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    // 6. 获取对话历史并验证
+    console.log('\n===== 验证对话历史 =====');
+    console.log('获取完整对话历史...');
+    const history = await getConversationHistory(childId);
+    
+    if (history && history.length > 0) {
+      console.log('对话历史详细内容:');
+      history.forEach((msg, index) => {
+        console.log(`${index + 1}. [${msg.sender}] ${msg.content}`);
+      });
+    } else {
+      console.log('警告: 对话历史为空或未正确保存');
+    }
+    
+    console.log('\n===== 游戏场景多轮聊天测试完成 =====');
   } catch (error) {
     console.error('测试失败:', error);
   }
 }
 
-// 执行测试
-runMultiTurnTest();
+// 运行测试
+runGameScenarioTest();
