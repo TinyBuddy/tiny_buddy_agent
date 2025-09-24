@@ -1,4 +1,4 @@
-import { openai } from "@ai-sdk/openai";
+import { deepseek } from "@ai-sdk/deepseek";
 import { generateText } from "ai";
 import { config } from "dotenv";
 import type { ChildProfile } from "../models/childProfile";
@@ -50,7 +50,7 @@ export class ExecutionAgent implements BaseActor {
 		this.type = "executionAgent";
 		this.config = {
 			useLLM: true,
-			model: "gpt-4.1",
+			model: "deepseek-chat",
 			...config,
 		};
 		this.knowledgeBaseService = config.knowledgeBaseService;
@@ -119,7 +119,7 @@ export class ExecutionAgent implements BaseActor {
 
 				// 调用大模型生成初始响应
 				const result = await generateText({
-					model: openai("gpt-4.1"),
+					model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
 					prompt,
 					maxOutputTokens: 100,
 					temperature: 0.7,
@@ -244,11 +244,11 @@ export class ExecutionAgent implements BaseActor {
 
 			// 调用大模型生成响应
 			const result = await generateText({
-				model: openai("gpt-4.1"),
-				prompt,
-				maxOutputTokens: 200,
-				temperature: 0.7,
-			});
+						model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
+						prompt,
+						maxOutputTokens: 200,
+						temperature: 0.7,
+					});
 
 			return result.text.trim();
 		} catch (error) {

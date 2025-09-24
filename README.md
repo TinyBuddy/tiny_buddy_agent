@@ -7,9 +7,9 @@ TinyBuddy是一个专为4-7岁儿童设计的智能助手Agent系统，可以通
 - **友好的儿童交互**：专为4-7岁儿童设计，使用适合儿童的语言风格
 - **多模态交互**：支持文本输入和流式响应输出
 - **多接口支持**：同时提供Console UI、HTTP API和WebSocket接口
-- **真实LLM模型**：基于OpenAI的GPT模型进行决策和规划
+- **真实LLM模型**：基于DeepSeek的模型进行决策和规划
 - **流式响应**：通过WebSocket实现流式输出，避免阻塞
-- **健康检查**：提供连接状态和OpenAI API连接测试功能
+- **健康检查**：提供连接状态和DeepSeek API连接测试功能
 
 ## 技术架构
 
@@ -31,11 +31,11 @@ npm install
 复制`.env.example`文件并重命名为`.env`，然后填写必要的配置：
 
 ```bash
-# OpenAI API密钥
-OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# DeepSeek API密钥
+DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-# OpenAI模型名称（可选，默认使用gpt-4.1）
-OPENAI_MODEL=gpt-4o-mini
+# DeepSeek模型名称（可选，默认使用deepseek-chat）
+DEEPSEEK_MODEL=deepseek-chat
 ```
 
 ### 3. 启动应用
@@ -102,7 +102,7 @@ curl -X POST http://localhost:3142/api/chat \-H "Content-Type: application/json"
 
 ### 4. 连接检查
 
-可以通过WebSocket检查OpenAI API连接状态：
+可以通过WebSocket检查DeepSeek API连接状态：
 
 ```javascript
 socket.send(JSON.stringify({
@@ -146,12 +146,12 @@ README.md                 # 项目文档
 - `user_input`: 发送用户输入
 - `agent_response`: 接收Agent响应（服务器发送）
 - `ping`: 心跳消息
-- `check_connection`: 检查OpenAI API连接状态
+- `check_connection`: 检查DeepSeek API连接状态
 - `connection_status`: 连接状态响应（服务器发送）
 
 ## 注意事项
 
-1. 确保已正确配置OpenAI API密钥
+1. 确保已正确配置DeepSeek API密钥
 2. 本应用专为儿童设计，请确保使用适当的内容过滤机制
 3. 在生产环境中，请确保保护好API密钥和用户数据
 

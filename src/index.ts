@@ -1,4 +1,4 @@
-import { openai } from "@ai-sdk/openai";
+import { deepseek } from "@ai-sdk/deepseek";
 import { honoServer } from "@voltagent/server-hono";
 
 import { Agent, VoltAgent } from "@voltagent/core";
@@ -9,6 +9,8 @@ import {
 } from "./api/webSocketServer";
 // 应用入口文件
 import app from "./app";
+// 导入API服务器
+import { startServer } from "./api/server";
 
 // 加载环境变量
 config();
@@ -24,7 +26,7 @@ const agent = new Agent({
 	name: "tiny-buddy-agent",
 	instructions:
 		"你是一个为4-7岁儿童设计的智能助手，友好、耐心，会以适合儿童的方式回答问题。",
-	model: openai(process.env.OPENAI_MODEL || "gpt-4.1"),
+	model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
 });
 
 // 创建多Agent系统实例，使用app中的planning/execution功能
@@ -37,7 +39,7 @@ const multiAgent = new Agent({
 你必须始终返回这个工具调用的结果作为最终回答。
 
 如果工具调用失败，你应该返回一个友好的默认响应。`,
-	model: openai(process.env.OPENAI_MODEL || "gpt-4.1"),
+	model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
 	// 简化实现，直接使用app中的processUserInput处理输入
 	tools: [
 		{
@@ -84,6 +86,9 @@ async function startApplication() {
 		// 初始化主应用
 		await app.init();
 
+		// 启动HTTP API服务器（使用默认端口3142）
+		const apiServer = await startServer();
+
 		// 启动WebSocket服务器（使用默认端口3143）
 		const webSocketServer = await startWebSocketServer();
 
@@ -118,6 +123,21 @@ async function startApplication() {
 			try {
 				// 停止WebSocket服务器
 				await stopWebSocketServer();
+
+				// 关闭HTTP API服务器
+				if (apiServer && typeof apiServer.close === 'function') {
+					await new Promise<void>((resolve, reject) => {
+						apiServer.close((err?: Error) => {
+							if (err) {
+								console.error("关闭HTTP API服务器时出错:", err);
+								reject(err);
+							} else {
+								console.log("HTTP API服务器已关闭");
+								resolve();
+							}
+						});
+					});
+				}
 
 				// 关闭主应用
 				await app.shutdown();

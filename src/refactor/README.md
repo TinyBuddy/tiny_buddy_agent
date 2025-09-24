@@ -3,7 +3,7 @@
 ## 目标
 - 支持3141端口console可视化UI测试
 - 支持WebSocket流式调用第三方系统
-- 确保agent真实调用OpenAI LLM模型进行决策和规划
+- 确保agent真实调用DeepSeek LLM模型进行决策和规划
 
 ## 架构设计
 

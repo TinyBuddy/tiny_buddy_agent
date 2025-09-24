@@ -110,7 +110,7 @@ class AgentWebSocketClient {
 
 				case "connection_status":
 					console.log(
-						"OpenAI连接状态:",
+						"DeepSeek连接状态:",
 						message.connected ? "连接成功" : "连接失败",
 					);
 					console.log("连接状态详情:", message.message);
@@ -156,7 +156,7 @@ class AgentWebSocketClient {
 	}
 
 	/**
-	 * 检查OpenAI连接状态
+	 * 检查DeepSeek连接状态
 	 */
 	checkConnection(): void {
 		this.send({
@@ -241,7 +241,7 @@ function runExample() {
 	console.log("输入消息发送给服务器，或输入以下命令:");
 	console.log("  exit  - 退出客户端");
 	console.log("  ping  - 发送ping消息");
-	console.log("  check - 检查OpenAI连接状态");
+	console.log("  check - 检查DeepSeek连接状态");
 }
 
 // 如果直接运行此文件，则执行示例

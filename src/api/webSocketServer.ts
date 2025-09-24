@@ -200,8 +200,8 @@ class WebSocketMessageHandler {
 
 	private async handleConnectionCheck(ws: WebSocket): Promise<void> {
 		try {
-			// 检查OpenAI连接状态
-			const connectionStatus = await app.checkOpenAIConnection();
+			// 检查DeepSeek连接状态
+			const connectionStatus = await app.checkDeepSeekConnection();
 
 			// 发送连接状态
 			ws.send(

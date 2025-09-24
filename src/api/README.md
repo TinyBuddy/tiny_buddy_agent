@@ -209,7 +209,7 @@ API 使用标准的 HTTP 状态码来表示请求的结果：
 
 ## 开发模式
 
-当 `DEVELOPMENT_MODE=true` 环境变量设置时，API 将使用模拟响应，无需连接 OpenAI API。这对于开发和测试非常有用。
+当 `DEVELOPMENT_MODE=true` 环境变量设置时，API 将使用模拟响应，无需连接 DeepSeek API。这对于开发和测试非常有用。
 
 ## 部署
 

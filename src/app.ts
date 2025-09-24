@@ -1,4 +1,4 @@
-import { openai } from "@ai-sdk/openai";
+import { deepseek } from "@ai-sdk/deepseek";
 import { config } from "dotenv";
 // 主应用文件
 import { ActorManager } from "./factories/actorManager";
@@ -279,7 +279,7 @@ export class TinyBuddyApp {
 					knowledgeBaseService: this.knowledgeBaseService,
 					memoryService: this.memoryService,
 					useLLM: true, // 确保使用真实的LLM
-					model: process.env.OPENAI_MODEL || "gpt-4.1",
+					model: process.env.DEEPSEEK_MODEL || "deepseek-chat",
 				});
 				await planningAgent.init?.(context);
 			}
@@ -292,7 +292,7 @@ export class TinyBuddyApp {
 					knowledgeBaseService: this.knowledgeBaseService,
 					memoryService: this.memoryService,
 					useLLM: true, // 确保使用真实的LLM
-					model: process.env.OPENAI_MODEL || "gpt-4.1",
+					model: process.env.DEEPSEEK_MODEL || "deepseek-chat",
 				});
 				await executionAgent.init?.(context);
 			}
@@ -411,24 +411,24 @@ export class TinyBuddyApp {
 		}
 	}
 
-	// 检查OpenAI API连接状态
-	public async checkOpenAIConnection(): Promise<{
+	// 检查DeepSeek连接状态
+	public async checkDeepSeekConnection(): Promise<{
 		connected: boolean;
 		message: string;
 	}> {
 		try {
-			if (!process.env.OPENAI_API_KEY) {
-				return { connected: false, message: "未配置OpenAI API密钥" };
+			if (!process.env.DEEPSEEK_API_KEY) {
+				return { connected: false, message: "未配置DeepSeek API密钥" };
 			}
 
 			// 尝试一个简单的API调用
 			const testMessage = "你好";
-			console.log("测试OpenAI API连接...");
+			console.log("测试DeepSeek API连接...");
 
 			// 创建一个最小的测试Agent
 			const testAgent = await this.actorManager.createActor("executionAgent", {
 				useLLM: true,
-				model: process.env.OPENAI_MODEL || "gpt-4.1",
+				model: process.env.DEEPSEEK_MODEL || "deepseek-chat",
 				knowledgeBaseService: this.knowledgeBaseService,
 				memoryService: this.memoryService,
 			});
@@ -449,15 +449,15 @@ export class TinyBuddyApp {
 			});
 
 			if (result?.output) {
-				console.log("OpenAI API连接成功");
-				return { connected: true, message: "OpenAI API连接成功" };
+				console.log("DeepSeek API连接成功");
+				return { connected: true, message: "DeepSeek API连接成功" };
 			}
 			throw new Error("API调用成功但未返回预期结果");
 		} catch (error) {
-			console.error("OpenAI API连接测试失败:", error);
+			console.error("DeepSeek API连接测试失败:", error);
 			return {
 				connected: false,
-				message: `OpenAI API连接失败: ${error instanceof Error ? error.message : "未知错误"}`,
+				message: `DeepSeek API连接失败: ${error instanceof Error ? error.message : "未知错误"}`,
 			};
 		}
 	}
