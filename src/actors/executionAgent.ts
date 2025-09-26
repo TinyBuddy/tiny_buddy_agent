@@ -121,7 +121,7 @@ export class ExecutionAgent implements BaseActor {
 				const result = await generateText({
 					model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
 					prompt,
-					maxOutputTokens: 100,
+					maxOutputTokens: 300, // 增加token数以支持更长的响应
 					temperature: 0.7,
 				});
 
