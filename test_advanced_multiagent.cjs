@@ -13,11 +13,11 @@ const testCases = [
   },
   {
     name: '知识问答测试',
-    message: '你知道为什么天空是蓝色的吗？请用简单易懂的语言解释。'
+    message: 'Do you know why sky is blue？'
   },
   {
     name: '创意启发测试',
-    message: '我想画一幅关于海洋世界的画，你能给我一些创意建议吗？'
+    message: 'I wanna build a beautiful graph of ocean, 你可以帮助我吗？'
   }
 ];
 

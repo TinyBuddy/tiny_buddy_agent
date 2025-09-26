@@ -173,15 +173,65 @@ export class PlanningAgent implements BaseActor {
 		// 解析大模型返回的JSON规划
 		let llmPlan: Record<string, unknown>;
 		try {
-			// 从返回结果中提取JSON部分
-			const jsonMatch = result.text.trim().match(/\{[\s\S]*\}/);
+			// 从返回结果中提取JSON部分，使用更健壮的正则表达式
+			const text = result.text.trim();
+			console.log("LLM原始响应:", text); // 用于调试
+			
+			// 尝试多种方式提取JSON
+			let jsonStr: string | null = null;
+			
+			// 方式1: 查找标准JSON对象或数组
+			const jsonMatch = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
 			if (jsonMatch?.[0]) {
-				llmPlan = JSON.parse(jsonMatch[0]);
+				jsonStr = jsonMatch[0];
+			}
+			
+			// 方式2: 如果方式1失败，尝试查找代码块中的JSON
+			if (!jsonStr) {
+				const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*\}|\[[\s\S]*\])\s*```/);
+				if (codeBlockMatch?.[1]) {
+					jsonStr = codeBlockMatch[1];
+				}
+			}
+			
+			// 方式3: 如果仍然没有找到，尝试更宽松的匹配
+			if (!jsonStr) {
+				const looseMatch = text.match(/(\{[^}]*"interactionType"[^}]*\})/);
+				if (looseMatch?.[1]) {
+					jsonStr = looseMatch[1];
+				}
+			}
+			
+			if (jsonStr) {
+				// 在清理之前先记录原始提取的JSON字符串
+				console.log("提取的原始JSON字符串:", jsonStr);
+				
+				// 清理JSON字符串，移除可能导致解析失败的字符
+				// 但要更小心地处理，避免破坏有效的JSON结构
+				jsonStr = jsonStr
+					.replace(/\\n/g, "\\\\n")  // 转义换行符
+					.replace(/\\t/g, "\\\\t")  // 转义制表符
+					.replace(/\\\\n\s*\\\\n/g, "\\\\n")  // 合并多个换行符
+					.trim();
+				
+				console.log("清理后的JSON字符串:", jsonStr); // 用于调试
+				
+				// 尝试解析JSON
+				const parsedJson = JSON.parse(jsonStr);
+				
+				// 如果解析结果是数组，取第一个元素
+				if (Array.isArray(parsedJson)) {
+					console.log("检测到数组响应，使用第一个元素作为规划");
+					llmPlan = parsedJson[0];
+				} else {
+					llmPlan = parsedJson;
+				}
 			} else {
 				throw new Error("无法从LLM响应中提取有效的JSON");
 			}
 		} catch (error) {
 			console.error("解析大模型响应失败:", error);
+			console.error("LLM响应内容:", result.text);
 			// 使用默认规划
 			return this.createFallbackPlan(context);
 		}
