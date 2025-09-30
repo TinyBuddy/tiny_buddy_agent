@@ -121,6 +121,4 @@ async function startApplication() {
 }
 
 // 如果作为主程序运行，则启动应用
-if (import.meta.url.endsWith(process.argv[1])) {
-	startApplication();
-}
+startApplication();
