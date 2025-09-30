@@ -117,6 +117,9 @@ export class ExecutionAgent implements BaseActor {
 如果用户表达了想做游戏的意愿，请立即回应游戏相关内容。
 请直接回复合适的内容，不要包含任何额外信息。`;
 
+
+        console.log("executionAgent prompt :", prompt);
+
 				// 调用大模型生成初始响应
 				const result = await generateText({
 					model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
