@@ -1,7 +1,7 @@
 // 知识内容模型
 export interface KnowledgeContent {
 	id: string;
-	type: "lesson" | "song" | "story" | "game";
+	type: "lesson" | "song" | "story" | "game" | "chat";
 	title: string;
 	description: string;
 	content: string; // 内容主体，可以是文本、歌词等
@@ -14,7 +14,7 @@ export interface KnowledgeContent {
 
 // 创建新的知识内容
 export const createKnowledgeContent = (
-	type: "lesson" | "song" | "story" | "game",
+	type: "lesson" | "song" | "story" | "game" | "chat",
 	title: string,
 	description: string,
 	content: string,

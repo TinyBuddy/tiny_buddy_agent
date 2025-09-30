@@ -9,6 +9,7 @@ import {
 	createDefaultChildProfile,
 } from "./models/childProfile";
 import { type Message, createMessage } from "./models/message";
+import { type KnowledgeContent } from "./models/content";
 import { InMemoryKnowledgeBaseService } from "./services/inMemoryKnowledgeBaseService";
 import { InMemoryMemoryService } from "./services/memoryService";
 
@@ -58,7 +59,7 @@ export class TinyBuddyApp {
 		await this.knowledgeBaseService.init();
 		await this.memoryService.init();
 
-		// 注册Actor工厂
+		// 注册Actor工厂 - 只使用规划Agent和执行Agent（符合架构图要求）
 		this.actorManager.registerFactory(new PlanningAgentFactory());
 		this.actorManager.registerFactory(new ExecutionAgentFactory());
 
@@ -94,6 +95,10 @@ export class TinyBuddyApp {
 		}
 
 		try {
+			console.log(
+				`开始处理用户输入 (${childId}): ${userInput.substring(0, 50)}${userInput.length > 50 ? "..." : ""}`,
+			);
+
 			// 创建用户消息并添加到对话历史
 			const userMessage = createMessage({
 				type: "user",
@@ -106,7 +111,7 @@ export class TinyBuddyApp {
 
 			// 获取儿童档案和对话历史
 			const childProfile = await this.memoryService.getChildProfile(childId);
-			const conversationHistory =
+			const conversationHistory = 
 				await this.memoryService.getConversationHistory(childId);
 
 			// 创建Actor上下文
@@ -127,103 +132,106 @@ export class TinyBuddyApp {
 				await planningAgent.init?.(context);
 			}
 
+			// 调用规划Agent进行思考和规划
+			console.log("调用规划Agent进行思考和规划...");
+			const planResult = await planningAgent.process?.({
+				input: userMessage.content,
+				context,
+			});
+
+			if (!planResult || !planResult.output) {
+				throw new Error("规划Agent未返回有效的规划结果");
+			}
+
+			// 解析规划结果
+			let parsedPlanResult: any;
+			try {
+				parsedPlanResult = JSON.parse(planResult.output);
+			} catch (parseError) {
+				console.warn("解析规划结果失败，使用默认规划:", parseError);
+				parsedPlanResult = {
+					type: "plan",
+					interactionType: "chat",
+					strategy: "Chat with the child as a friend using simple and easy-to-understand language"
+				};
+			}
+
+			console.log("规划结果:", parsedPlanResult);
+
 			// 获取或创建执行Agent
-			let executionAgent =
+			let executionAgent = 
 				this.actorManager.getActorsByType("executionAgent")[0];
 			if (!executionAgent) {
 				executionAgent = await this.actorManager.createActor("executionAgent", {
 					knowledgeBaseService: this.knowledgeBaseService,
 					memoryService: this.memoryService,
+					useLLM: true,
+					model: process.env.DEEPSEEK_MODEL || "deepseek-chat",
 				});
 				await executionAgent.init?.(context);
 			}
 
-			// 创建默认响应消息
-			const defaultResponse = "我正在思考这个问题...";
-			const systemMessage = createMessage({
+			// 执行Agent根据规划结果生成响应
+			console.log("调用执行Agent生成响应...");
+			const executionResult = await executionAgent.process?.({
+				input: userMessage.content,
+				context,
+				plan: parsedPlanResult
+			});
+
+			if (!executionResult || !executionResult.output) {
+				throw new Error("执行Agent未返回有效的响应");
+			}
+
+			// 创建最终响应消息
+			const finalMessage = createMessage({
 				type: "system",
-				content: defaultResponse,
+				content: executionResult.output,
 				sender: "tiny_buddy",
 				recipient: "user",
 				metadata: {
-					interactionType: "chat",
-					isDefaultResponse: true,
+					interactionType: executionResult.metadata?.interactionType || "chat",
+					isFinalResponse: true,
 				},
 			});
 
-			// 立即添加默认响应到对话历史
-			await this.memoryService.addMessageToHistory(childId, systemMessage);
+			// 添加最终响应到对话历史
+			await this.memoryService.addMessageToHistory(childId, finalMessage);
 
-			// 异步执行规划Agent和更新响应的逻辑
-			(async () => {
-				try {
-					// 规划Agent创建互动计划（异步）
-					const planResult = await planningAgent.process?.({
-						input: userMessage.content,
-						context,
-					});
+			// 更新儿童档案的学习进度
+			if (
+				executionResult.metadata?.learningPoint &&
+				typeof executionResult.metadata.learningPoint === "string"
+			) {
+				await this.memoryService.trackLearningProgress(
+					childId,
+					executionResult.metadata.learningPoint,
+					typeof executionResult.metadata.progress === "number"
+						? executionResult.metadata.progress
+						: 10,
+				);
+			}
 
-					// 执行Agent根据计划生成响应
-					const executionResult = await executionAgent.process?.({
-						input: userMessage.content,
-						context,
-						plan: planResult?.output || {
-							type: "chat",
-							content: "默认响应计划",
-						},
-					});
+			console.log(
+				`生成最终响应: ${executionResult.output.substring(0, 50)}${executionResult.output.length > 50 ? "..." : ""}`,
+			);
 
-					// 如果生成了更好的响应，创建更新的消息
-					if (
-						executionResult?.output &&
-						executionResult.output !== defaultResponse
-					) {
-						const updatedMessage = createMessage({
-							type: "system",
-							content: executionResult.output,
-							sender: "tiny_buddy",
-							recipient: "user",
-							metadata: {
-								interactionType:
-									executionResult.metadata?.interactionType || "chat",
-								isUpdatedResponse: true,
-								originalMessageId: systemMessage.id,
-							},
-						});
-
-						// 添加更新后的响应到对话历史
-						await this.memoryService.addMessageToHistory(
-							childId,
-							updatedMessage,
-						);
-
-						// 更新儿童档案的学习进度
-						if (
-							executionResult.metadata?.learningPoint &&
-							typeof executionResult.metadata.learningPoint === "string"
-						) {
-							await this.memoryService.trackLearningProgress(
-								childId,
-								executionResult.metadata.learningPoint,
-								typeof executionResult.metadata.progress === "number"
-									? executionResult.metadata.progress
-									: 10,
-							);
-						}
-
-						console.log(`已更新响应: ${executionResult.output}`);
-					}
-				} catch (error) {
-					console.error("异步处理规划和执行时出错:", error);
-				}
-			})();
-
-			// 立即返回默认响应
-			return defaultResponse;
+			// 返回最终响应
+			return executionResult.output;
 		} catch (error) {
 			console.error("处理用户输入时出错:", error);
 			return "抱歉，我现在遇到了一些问题，请稍后再试";
 		}
+	}
+
+	// 添加知识内容
+	public async addKnowledgeContent(
+		content: Omit<KnowledgeContent, "id" | "createdAt" | "updatedAt">,
+	): Promise<KnowledgeContent> {
+		if (!this.isRunning) {
+			throw new Error("应用尚未初始化，请先调用init()方法");
+		}
+		return this.knowledgeBaseService.addContent(content);
 	}
 
 	// 处理用户输入（流式版本）

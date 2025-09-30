@@ -12,6 +12,27 @@ import type { ActorContext, BaseActor } from "./baseActor";
 // 加载环境变量
 config();
 
+// 儿童年龄分级
+interface AgeLevel {
+  minAge: number;
+  maxAge: number;
+  level: string;
+  characteristics: string[];
+  recommendedActivities: string[];
+}
+
+// 天级别计划接口
+interface DailyPlan {
+  date: string;
+  childId: string;
+  ageLevel: AgeLevel;
+  morningActivity: { type: string; content: string };
+  afternoonActivity: { type: string; content: string };
+  eveningActivity: { type: string; content: string };
+  objectives: string[];
+  notes: string;
+}
+
 // 开发模式标志
 const DEVELOPMENT_MODE = process.env.DEVELOPMENT_MODE === "true";
 
@@ -41,6 +62,34 @@ export class PlanningAgent implements BaseActor {
 	private lastPlan: PlanningResult | null = null;
 	private knowledgeBaseService: KnowledgeBaseService | undefined;
 	private memoryService: MemoryService | undefined;
+	private dailyPlans: Map<string, DailyPlan> = new Map(); // 存储每天的计划，key为childId_date
+	private scheduleTimer: NodeJS.Timeout | null = null;
+	private ageLevels: AgeLevel[] = [
+		{ minAge: 3,
+			maxAge: 4,
+			level: "Preschool启蒙期",
+			characteristics: ["Early language development", "Strong curiosity", "Concrete thinking"],
+			recommendedActivities: ["Simple storytelling", "Interactive games", "Basic cognition"]
+		},
+		{ minAge: 5,
+			maxAge: 6,
+			level: "Kindergarten准备期",
+			characteristics: ["Extended attention span", "Beginning to understand abstract concepts", "Social skills development"],
+			recommendedActivities: ["Structured stories", "Educational games", "Basic reading"]
+		},
+		{ minAge: 7,
+			maxAge: 9,
+			level: "Lower elementary小学低年级",
+			characteristics: ["Logical thinking development", "Increasing independence", "Enhanced learning ability"],
+			recommendedActivities: ["Knowledge exploration", "Creative expression", "Teamwork"]
+		},
+		{ minAge: 10,
+			maxAge: 12,
+			level: "Upper elementary小学高年级",
+			characteristics: ["Abstract thinking formation", "Self-directed learning", "Interest development"],
+			recommendedActivities: ["Thematic research", "Project-based learning", "Talent development"]
+		}
+	];
 
 	constructor(config: {
 		knowledgeBaseService?: KnowledgeBaseService;
@@ -59,6 +108,325 @@ export class PlanningAgent implements BaseActor {
 		this.state = {
 			initialized: true,
 			lastUpdated: new Date(),
+		};
+
+		// 启动周期调度器（每天凌晨1点执行）
+		this.startDailyScheduler();
+
+		// 如果有上下文，立即为当前儿童生成当天计划
+		if (context?.childProfile) {
+			await this.generateDailyPlanForChild(context.childProfile.id, context.childProfile);
+		}
+	}
+
+	// 启动每天的调度器
+	private startDailyScheduler(): void {
+		// 清除已有的定时器
+		if (this.scheduleTimer) {
+			clearTimeout(this.scheduleTimer);
+		}
+
+		// 计算距离下次执行的时间（明天凌晨1点）
+		const now = new Date();
+		const nextExecution = new Date(now);
+		nextExecution.setDate(nextExecution.getDate() + 1);
+		nextExecution.setHours(1, 0, 0, 0);
+		const delay = nextExecution.getTime() - now.getTime();
+
+		// 设置定时器
+		this.scheduleTimer = setTimeout(async () => {
+			try {
+				console.log("执行每日计划生成任务");
+				// 获取所有儿童档案并为每个儿童生成当天计划
+				if (this.memoryService) {
+					// 只为默认儿童生成计划（简化处理）
+					const defaultChildId = "default_child";
+					try {
+						const childProfile = await this.memoryService.getChildProfile(defaultChildId);
+						await this.generateDailyPlanForChild(defaultChildId, childProfile);
+					} catch (error) {
+						console.error(`为默认儿童生成计划失败:`, error);
+					}
+				}
+			} catch (error) {
+				console.error("执行每日计划生成任务失败:", error);
+			} finally {
+				// 递归设置下一次执行
+				this.startDailyScheduler();
+			}
+		}, delay);
+	}
+
+	// 为特定儿童生成当天计划
+	public async generateDailyPlanForChild(childId: string, childProfile?: ChildProfile): Promise<DailyPlan> {
+		try {
+			// 如果没有提供儿童档案，从服务中获取
+			if (!childProfile && this.memoryService) {
+				childProfile = await this.memoryService.getChildProfile(childId);
+				if (!childProfile) {
+					throw new Error(`未找到儿童档案: ${childId}`);
+				}
+			}
+
+			if (!childProfile) {
+				throw new Error(`无法为儿童生成计划: ${childId}，缺少儿童档案`);
+			}
+
+			const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD 格式
+			const planKey = `${childId}_${today}`;
+
+			// 检查是否已经存在当天计划
+			let dailyPlan = this.dailyPlans.get(planKey);
+			if (!dailyPlan) {
+				// 确定年龄级别
+				const ageLevel = this.determineAgeLevel(childProfile.age);
+
+				// 生成当天的活动计划
+				dailyPlan = await this.createDailyPlan(childProfile, ageLevel);
+
+				// 存储计划
+				this.dailyPlans.set(planKey, dailyPlan);
+
+
+
+				console.log(`为儿童 ${childProfile.name}(${childId}) 生成了当天计划:`, dailyPlan);
+			}
+
+			return dailyPlan;
+		} catch (error) {
+			console.error(`生成儿童计划失败:`, error);
+			// 返回一个默认的简单计划
+			const today = new Date().toISOString().split('T')[0];
+			const defaultPlan: DailyPlan = {
+				date: today,
+				childId: childId,
+				ageLevel: this.ageLevels[0], // 使用最低级别
+				morningActivity: { type: "chat", content: "早上好！今天感觉怎么样？" },
+				afternoonActivity: { type: "story", content: "让我们一起读个故事吧！" },
+				eveningActivity: { type: "chat", content: "今天过得开心吗？" },
+				objectives: ["建立情感连接", "鼓励表达"],
+				notes: "默认计划 - 生成过程中出现错误"
+			};
+			return defaultPlan;
+		}
+	}
+
+	// 确定儿童的年龄级别
+	private determineAgeLevel(age: number): AgeLevel {
+		for (const level of this.ageLevels) {
+			if (age >= level.minAge && age <= level.maxAge) {
+				return level;
+			}
+		}
+		// 如果没有匹配的级别，返回最高级别
+		return this.ageLevels[this.ageLevels.length - 1];
+	}
+
+	// 创建当天的详细计划
+	private async createDailyPlan(childProfile: ChildProfile, ageLevel: AgeLevel): Promise<DailyPlan> {
+		const today = new Date().toISOString().split('T')[0];
+
+		// 在开发模式下，使用简单的随机计划
+		if (DEVELOPMENT_MODE) {
+			return this.createMockDailyPlan(childProfile, ageLevel, today);
+		}
+
+		// 生产模式下，使用大模型生成计划
+		return this.createDailyPlanWithLLM(childProfile, ageLevel, today);
+	}
+
+	// 创建开发模式下的模拟天级别计划
+	private createMockDailyPlan(childProfile: ChildProfile, ageLevel: AgeLevel, date: string): DailyPlan {
+		// Activity type and content pools
+		const morningActivities = [
+			{ type: "chat", content: `Good morning, ${childProfile.name}! Today is a wonderful day!` },
+			{ type: "chat", content: `${childProfile.name}, did you sleep well last night?` },
+			{ type: "song", content: `Let's sing a good morning song together!` }
+		];
+
+		const afternoonActivities = [
+			{ type: "story", content: `${ageLevel.recommendedActivities.includes("Simple storytelling") || ageLevel.recommendedActivities.includes("Structured stories") ? "Let me tell you an interesting story" : "Let's play a fun game"}` },
+			{ type: "game", content: `${ageLevel.recommendedActivities.includes("Interactive games") || ageLevel.recommendedActivities.includes("Educational games") ? "Let's play a guessing game" : "Let's explore new knowledge together"}` },
+			{ type: "lesson", content: `${ageLevel.recommendedActivities.includes("Basic cognition") || ageLevel.recommendedActivities.includes("Knowledge exploration") ? "Today let's learn new knowledge" : "Let's use our imagination to create something"}` }
+		];
+
+		const eveningActivities = [
+			{ type: "chat", content: `Did you have a good day, ${childProfile.name}?` },
+			{ type: "story", content: `It's bedtime story time!` },
+			{ type: "chat", content: `Did anything interesting happen today?` }
+		];
+
+		// Randomly select activities
+		const getRandomActivity = (activities: {type: string, content: string}[]) => {
+			return activities[Math.floor(Math.random() * activities.length)];
+		};
+
+		// Generate objectives based on age level and interests
+		const objectives = [
+			`Based on cognitive characteristics of ${ageLevel.level} children`,
+			`Aligns with ${childProfile.name}'s interests: ${childProfile.interests[0] || "Exploration"}`,
+			...ageLevel.recommendedActivities.slice(0, 2)
+		];
+
+		return {
+			date: date,
+			childId: childProfile.id,
+			ageLevel: ageLevel,
+			morningActivity: getRandomActivity(morningActivities),
+			afternoonActivity: getRandomActivity(afternoonActivities),
+			eveningActivity: getRandomActivity(eveningActivities),
+			objectives: objectives,
+			notes: "Mock plan in development mode"
+		};
+	}
+
+	// 使用大模型生成天级别计划
+	private async createDailyPlanWithLLM(childProfile: ChildProfile, ageLevel: AgeLevel, date: string): Promise<DailyPlan> {
+		try {
+			// 构建天级别计划提示词
+			const prompt = this.buildDailyPlanPrompt(childProfile, ageLevel, date);
+
+			// 调用大模型生成计划
+			const result = await generateText({
+				model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
+				prompt,
+				maxOutputTokens: 800,
+				temperature: 0.7,
+			});
+
+			// 解析大模型返回的JSON计划
+			let dailyPlan: DailyPlan;
+			try {
+				// 从返回结果中提取JSON部分
+				const text = result.text.trim();
+				console.log("LLM天级别计划原始响应:", text);
+
+				// 尝试多种方式提取JSON
+				let jsonStr: string | null = null;
+
+				// 方式1: 查找标准JSON对象
+				const jsonMatch = text.match(/(\{[\s\S]*\})/);
+				if (jsonMatch?.[0]) {
+					jsonStr = jsonMatch[0];
+				}
+
+				// 方式2: 查找代码块中的JSON
+				if (!jsonStr) {
+					const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+					if (codeBlockMatch?.[1]) {
+						jsonStr = codeBlockMatch[1];
+					}
+				}
+
+				if (jsonStr) {
+					// 清理JSON字符串
+					jsonStr = jsonStr
+						.replace(/\\n/g, "\\\\n")
+						.replace(/\\t/g, "\\\\t")
+						.trim();
+
+					// 解析JSON
+					const parsedJson = JSON.parse(jsonStr);
+
+					// 构建DailyPlan对象
+					dailyPlan = {
+						date: date,
+						childId: childProfile.id,
+						ageLevel: ageLevel,
+						morningActivity: {
+							type: parsedJson.morningActivity?.type || "chat",
+							content: parsedJson.morningActivity?.content || "早上好！"
+						},
+						afternoonActivity: {
+							type: parsedJson.afternoonActivity?.type || "story",
+							content: parsedJson.afternoonActivity?.content || "让我们一起读个故事吧！"
+						},
+						eveningActivity: {
+							type: parsedJson.eveningActivity?.type || "chat",
+							content: parsedJson.eveningActivity?.content || "今天过得开心吗？"
+						},
+						objectives: Array.isArray(parsedJson.objectives) ? parsedJson.objectives : ["建立情感连接", "促进学习"],
+						notes: parsedJson.notes || "大模型生成的天级别计划"
+					};
+				} else {
+					throw new Error("无法从LLM响应中提取有效的JSON");
+				}
+			} catch (error) {
+				console.error("解析天级别计划失败:", error);
+				// 返回默认计划
+				return this.createMockDailyPlan(childProfile, ageLevel, date);
+			}
+
+			return dailyPlan;
+		} catch (error) {
+			console.error("大模型生成天级别计划失败:", error);
+			// 返回默认计划
+			return this.createMockDailyPlan(childProfile, ageLevel, date);
+		}
+	}
+
+	// 构建天级别计划提示词
+	private buildDailyPlanPrompt(childProfile: ChildProfile, ageLevel: AgeLevel, date: string): string {
+		return `You are a professional children's education planner, and you need to create a daily companionship plan for ${childProfile.name} (${childProfile.age} years old).\nChild Age Level: ${ageLevel.level}\nChild Characteristics: ${ageLevel.characteristics.join(", ")}\nRecommended Activities: ${ageLevel.recommendedActivities.join(", ")}\nChild Interests: ${childProfile.interests.join(", ")}\nBased on the above information, generate a detailed daily companionship plan including morning, afternoon, and evening sessions.\nEach session should include:\n- type: activity type (chat, song, story, game, lesson)\n- content: specific activity content\n\nThe plan should consider:\n1. Suitable for the cognitive development level of a ${childProfile.age}-year-old child\n2. Combining the child's interests and hobbies\n3. Including both educational and fun elements\n4. Various activity types in different sessions to avoid repetition\n\nPlease return in JSON format with the following fields:\n{\n  "morningActivity": {"type": "", "content": ""},\n  "afternoonActivity": {"type": "", "content": ""},\n  "eveningActivity": {"type": "", "content": ""},\n  "objectives": ["Objective 1", "Objective 2", "Objective 3"],\n  "notes": "Plan description"\n}\nPlease ensure the JSON format is correct and does not include any additional text.`;
+	}
+
+	// 获取儿童当天的计划
+	public getChildDailyPlan(childId: string): DailyPlan | null {
+		const today = new Date().toISOString().split('T')[0];
+		const planKey = `${childId}_${today}`;
+		return this.dailyPlans.get(planKey) || null;
+	}
+
+	// 根据当前时间获取推荐的活动
+	public getRecommendedActivity(childId: string): {type: string, content: string} | null {
+		const dailyPlan = this.getChildDailyPlan(childId);
+		if (!dailyPlan) {
+			return null;
+		}
+
+		const now = new Date();
+		const hour = now.getHours();
+
+		// 根据当前时间返回推荐活动
+		if (hour < 12) {
+			return dailyPlan.morningActivity;
+		} else if (hour < 18) {
+			return dailyPlan.afternoonActivity;
+		} else {
+			return dailyPlan.eveningActivity;
+		}
+	}
+
+	// 清理过期的计划（保留最近7天的计划）
+	public cleanupExpiredPlans(): void {
+		const sevenDaysAgo = new Date();
+		sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+		const cutoffDate = sevenDaysAgo.toISOString().split('T')[0];
+
+		for (const [key, plan] of this.dailyPlans.entries()) {
+			if (plan.date < cutoffDate) {
+				this.dailyPlans.delete(key);
+			}
+		}
+		console.log(`清理过期计划完成，当前保留计划数: ${this.dailyPlans.size}`);
+	}
+
+	// 停止周期调度器
+	public stopScheduler(): void {
+		if (this.scheduleTimer) {
+			clearTimeout(this.scheduleTimer);
+			this.scheduleTimer = null;
+			console.log("计划调度器已停止");
+		}
+	}
+
+	// 实现BaseActor接口的getState方法，包含计划信息
+	getState(): Record<string, unknown> {
+		return {
+			...this.state,
+			lastPlan: this.lastPlan,
+		dailyPlansCount: this.dailyPlans.size,
+		schedulerRunning: this.scheduleTimer !== null
 		};
 	}
 
@@ -128,17 +496,12 @@ export class PlanningAgent implements BaseActor {
 		// 简单的模拟规划逻辑
 		return {
 			type: InteractionType.CHAT,
-			objectives: ["建立情感连接", "鼓励表达"],
-			strategy: `以朋友的身份与${childProfile.name}聊天，使用简单易懂的语言，保持积极鼓励的语气。`,
+			objectives: ["Build emotional connection", "Encourage expression"],
+			strategy: `Chat with ${childProfile.name} as a friend, using simple and easy-to-understand language, maintaining a positive and encouraging tone.`,
 		};
 	}
 
-	getState(): Record<string, unknown> {
-		return {
-			...this.state,
-			lastPlan: this.lastPlan,
-		};
-	}
+
 
 	setState(state: Record<string, unknown>): void {
 		this.state = state;
@@ -261,16 +624,16 @@ export class PlanningAgent implements BaseActor {
 		knowledgeSummary: string,
 	): string {
 		const messagesText = recentMessages
-			.map((m) => `${m.type === "user" ? "用户" : "助手"}: ${m.content}`)
+			.map((m) => `${m.type === "user" ? "User" : "Assistant"}: ${m.content}`)
 			.join("\n");
 
-		return `你是一个专业的儿童陪伴助手规划师，需要为${childProfile.name}（${childProfile.age}岁）制定互动计划。\n儿童兴趣爱好：${childProfile.interests.join(", ")}\n最近的对话历史：\n${messagesText}\n可用的知识库内容：\n${knowledgeSummary}\n请根据儿童的年龄、兴趣、最近对话和可用知识库，生成一个详细的互动计划。\n互动类型可以是：chat（聊天）、song（唱歌）、story（讲故事）、game（玩游戏）、lesson（学习）\n请以JSON格式返回，包含以下字段：\n- interactionType: 互动类型\n- contentId: 可以使用的知识库内容ID（如果有）\n- objectives: 互动目标数组\n- strategy: 互动策略描述\n请确保JSON格式正确，不要包含任何额外的文本。`;
+		return `You are a professional children's companion assistant planner, and you need to create an interaction plan for ${childProfile.name} (${childProfile.age} years old).\nChild Interests and Hobbies: ${childProfile.interests.join(", ")}\nRecent Conversation History:\n${messagesText}\nAvailable Knowledge Base Content:\n${knowledgeSummary}\nBased on the child's age, interests, recent conversations, and available knowledge base, generate a detailed interaction plan.\nInteraction types can be: chat, song, story, game, lesson\nPlease return in JSON format with the following fields:\n- interactionType: interaction type\n- contentId: ID of knowledge base content that can be used (if any)\n- objectives: array of interaction objectives\n- strategy: interaction strategy description\nPlease ensure the JSON format is correct and does not include any additional text.`;
 	}
 
 	// 总结知识库内容
 	private summarizeKnowledgeBase(knowledgeBase: KnowledgeContent[]): string {
 		if (!knowledgeBase || knowledgeBase.length === 0) {
-			return "暂无可用知识库内容";
+			return "No available knowledge base content";
 		}
 
 		return knowledgeBase
@@ -301,8 +664,8 @@ export class PlanningAgent implements BaseActor {
 		// 简单的默认规划逻辑
 		return {
 			type: InteractionType.CHAT,
-			objectives: ["建立情感连接", "鼓励表达"],
-			strategy: `以朋友的身份与${childProfile.name}聊天，使用简单易懂的语言，保持积极鼓励的语气。`,
+			objectives: ["Build emotional connection", "Encourage expression"],
+			strategy: `Chat with ${childProfile.name} as a friend, using simple and easy-to-understand language, maintaining a positive and encouraging tone.`,
 		};
 	}
 
@@ -315,11 +678,11 @@ export class PlanningAgent implements BaseActor {
 	private generateResponse(plan: PlanningResult): string {
 		// 将计划转换为执行Agent可以理解的指令
 		const interactionTypeMap: Record<InteractionType, string> = {
-			[InteractionType.CHAT]: "聊天",
-			[InteractionType.SONG]: "唱歌",
-			[InteractionType.STORY]: "讲故事",
-			[InteractionType.GAME]: "玩游戏",
-			[InteractionType.LESSON]: "学习",
+			[InteractionType.CHAT]: "chat",
+			[InteractionType.SONG]: "song",
+			[InteractionType.STORY]: "story",
+			[InteractionType.GAME]: "game",
+			[InteractionType.LESSON]: "lesson",
 		};
 
 		return JSON.stringify({

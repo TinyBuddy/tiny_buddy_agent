@@ -1,22 +1,29 @@
-# TinyBuddy Agent
+# TinyBuddy Multi-Agent System
 
-TinyBuddy是一个专为4-7岁儿童设计的智能助手Agent系统，可以通过多种方式进行交互：Console UI测试界面、HTTP API和WebSocket连接。
+TinyBuddy是一个专为4-7岁儿童设计的智能助手Agent系统，可以通过多种方式进行交互：Console UI测试界面、HTTP API、WebSocket连接，以及新的原子SDK接口。
 
 ## 功能特点
 
 - **友好的儿童交互**：专为4-7岁儿童设计，使用适合儿童的语言风格
 - **多模态交互**：支持文本输入和流式响应输出
-- **多接口支持**：同时提供Console UI、HTTP API和WebSocket接口
+- **多接口支持**：同时提供Console UI、HTTP API、WebSocket接口和SDK
 - **真实LLM模型**：基于DeepSeek的模型进行决策和规划
 - **流式响应**：通过WebSocket实现流式输出，避免阻塞
 - **健康检查**：提供连接状态和DeepSeek API连接测试功能
+- **双Agent架构**：Planning Agent负责策略制定，Execution Agent负责交互执行
+- **知识库支持**：包含聊天、歌曲、故事、游戏和学习内容
+- **原子SDK**：提供易于集成的SDK接口
+- **英文支持**：兼容海外大语言模型，适用于美国小朋友
 
 ## 技术架构
 
 - **主应用层**：`src/app.ts`实现TinyBuddy的核心功能和智能交互逻辑
 - **HTTP服务器**：`src/api/server.ts`提供RESTful API接口
 - **WebSocket服务器**：`src/api/webSocketServer.ts`提供实时流式通信接口
-- **入口文件**：`src/index.ts`统一启动所有服务
+- **入口文件**：`src/index.ts`统一启动所有服务并导出SDK
+- **SDK**：`src/sdk.ts`提供原子SDK接口
+- **Agent实现**：`src/actors/`包含Planning Agent和Execution Agent实现
+- **知识库**：`src/services/inMemoryKnowledgeBaseService.ts`管理系统知识内容
 
 ## 安装与配置
 
@@ -48,6 +55,88 @@ npm start
 - **Console UI**：http://localhost:3141
 - **HTTP API**：http://localhost:3142
 - **WebSocket Server**：ws://localhost:3143
+
+## SDK使用说明
+
+TinyBuddy提供了一个简洁的SDK，允许第三方项目轻松集成和使用多Agent系统功能。
+
+### 基本用法
+
+```javascript
+import { createTinyBuddySDK } from 'tiny-buddy-agent';
+
+// 初始化SDK
+const sdk = await createTinyBuddySDK('child_123');
+
+// 处理用户输入并获取响应
+const response = await sdk.processUserInput('Tell me a story about animals');
+console.log('TinyBuddy response:', response);
+
+// 获取对话历史
+const history = await sdk.getConversationHistory();
+
+// 更新儿童档案
+await sdk.updateChildProfile({
+  interests: ['animals', 'science', 'painting'],
+  age: 6
+});
+
+// 使用完毕后，关闭SDK
+await sdk.shutdown();
+```
+
+### 高级用法
+
+```javascript
+import TinyBuddySDK from 'tiny-buddy-agent';
+
+// 创建特定儿童ID的实例
+const sdk = new TinyBuddySDK('child_456');
+
+// 手动初始化
+const initResult = await sdk.init();
+if (!initResult.success) {
+  console.error('SDK初始化失败:', initResult.message);
+}
+
+// 添加自定义知识库内容
+await sdk.addKnowledgeContent({
+  title: 'The Solar System',
+  description: 'Learn about the planets in our solar system',
+  content: JSON.stringify({
+    planets: ['Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune'],
+    facts: 'The Sun is at the center of our solar system.'
+  }),
+  language: 'en',
+  difficulty: 'medium',
+  categories: ['science', 'astronomy']
+});
+
+// 分析儿童兴趣
+const interests = await sdk.analyzeChildInterests();
+console.log('Child interests:', interests);
+
+// 检查SDK运行状态
+const isRunning = sdk.isRunning();
+console.log('SDK is running:', isRunning);
+```
+
+## 多Agent系统工作流程
+
+1. **输入处理**：通过SDK接收用户输入
+2. **规划阶段**：Planning Agent根据用户输入、儿童档案和知识库创建交互计划
+3. **执行阶段**：Execution Agent根据计划生成响应
+4. **响应**：将最终响应返回给用户
+5. **历史更新**：交互内容被保存到对话历史
+
+## 知识库内容
+
+知识库包含以下类型的内容：
+- **聊天**：关于感受、爱好等日常对话
+- **歌曲**：包含歌词和旋律的儿童歌曲
+- **故事**：教育性和娱乐性故事
+- **游戏**：用于学习和娱乐的互动游戏
+- **学习**：关于各种主题的教育内容
 
 ## 使用方式
 

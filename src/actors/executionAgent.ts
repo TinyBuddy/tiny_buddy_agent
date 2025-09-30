@@ -71,6 +71,7 @@ export class ExecutionAgent implements BaseActor {
 		input: string;
 		context: ActorContext;
 		plan?: ExecutionPlan;
+		relevantKnowledge?: any;
 	}): Promise<{ output: string; metadata?: Record<string, unknown> }> {
 		// 使用传入的计划
 		if (input.plan) {
@@ -108,14 +109,14 @@ export class ExecutionAgent implements BaseActor {
 			}
 
 			try {
-				// 构建更智能的响应提示词，考虑用户的输入内容
-				const prompt = `你是TinyBuddy，一个儿童智能陪伴助手，专门陪伴${input.context.childProfile.name}（${input.context.childProfile.age}岁）。
-儿童的兴趣爱好是: ${input.context.childProfile.interests.join(", ")}
-请用简单、友好、活泼的语气，符合${input.context.childProfile.age}岁儿童的认知水平。
-当前互动类型: ${this.state.currentInteractionType || "聊天"}
-用户刚才说: "${input.input}"
-如果用户表达了想做游戏的意愿，请立即回应游戏相关内容。
-请直接回复合适的内容，不要包含任何额外信息。`;
+				// 构建更智能的响应提示词，使用Sparky角色设定
+			const prompt = this.buildPrompt(
+				input.input,
+				input.context.childProfile,
+				input.context.conversationHistory,
+				input.plan,
+				input.relevantKnowledge
+			);
 
 
         console.log("executionAgent prompt :", prompt);
@@ -153,11 +154,11 @@ export class ExecutionAgent implements BaseActor {
 			} catch (error) {
 				console.error("生成初始响应失败:", error);
 				// 降级到默认初始响应
-				const greetings = [
-					`你好！我是你的好朋友TinyBuddy！我听说你叫${input.context.childProfile.name}，今年${input.context.childProfile.age}岁了，对吗？`,
-					`嗨！${input.context.childProfile.name}小朋友你好呀！我是TinyBuddy，很高兴认识你！`,
-					`你好呀${input.context.childProfile.name}！我是TinyBuddy，我们来一起玩吧！`,
-				];
+			const greetings = [
+				`Hi there! I'm Sparky, your friendly dinosaur pal! I hear your name is ${input.context.childProfile.name} and you're ${input.context.childProfile.age} years old! Nice to meet you!`,
+				`Hey ${input.context.childProfile.name}! I'm Sparky the dinosaur! Let's be friends and learn Chinese together!`,
+				`Roar! Hi ${input.context.childProfile.name}! I'm Sparky! I can't wait to play and learn with you!`,
+			];
 				const defaultResponse =
 					greetings[Math.floor(Math.random() * greetings.length)];
 
@@ -265,10 +266,10 @@ export class ExecutionAgent implements BaseActor {
 	private createMockGreeting(context: ActorContext): string {
 		const { childProfile } = context;
 		const greetings = [
-			`你好！我是你的好朋友TinyBuddy！我听说你叫${childProfile.name}，今年${childProfile.age}岁了，对吗？`,
-			`嗨！${childProfile.name}小朋友你好呀！我是TinyBuddy，很高兴认识你！`,
-			`你好呀${childProfile.name}！我是TinyBuddy，我们来一起玩吧！`,
-			`哇！${childProfile.name}小朋友，你好可爱呀！我是你的新朋友TinyBuddy！`,
+			`Hi there! I'm Sparky, your friendly dinosaur pal! I hear your name is ${childProfile.name} and you're ${childProfile.age} years old! Nice to meet you! 我听得到你！wǒ tīng dé dào nǐ!`,
+			`Hey ${childProfile.name}! I'm Sparky the dinosaur! Let's be friends and learn Chinese together! 我们来玩吧！wǒ men lái wán ba!`,
+			`Roar! Hi ${childProfile.name}! I'm Sparky! I can't wait to play and learn with you! 太有趣了！tài yǒu qù le!`,
+			`Oh hi ${childProfile.name}! I'm Sparky! I'm a dinosaur who loves to learn Chinese words! 你好！nǐ hǎo! That means "hello"!`,
 		];
 
 		return greetings[Math.floor(Math.random() * greetings.length)];
@@ -278,61 +279,97 @@ export class ExecutionAgent implements BaseActor {
 	private createMockResponse(message: string, context: ActorContext): string {
 		const { childProfile } = context;
 
-		// 简单的响应映射
+		// 简单的响应映射 - 英文为主，插入中文词汇
 		const responseMap: Record<string, string[]> = {
-			你好: [
-				`${childProfile.name}你好呀！今天过得怎么样？`,
-				"你好你好！很高兴见到你！",
+			"hello": [
+				`Hi ${childProfile.name}! It's so nice to hear from you! 你好！nǐ hǎo! That means "hello" in Chinese!`,
+				`Hello hello! How's your day going? Let's learn a new Chinese word today! 你好！nǐ hǎo!`,
 			],
-			你是谁: [
-				"我是TinyBuddy，你的智能陪伴助手！",
-				"我是TinyBuddy，专门来陪你玩的！",
+			"who are you": [
+				`I'm Sparky, your fuzzy dinosaur friend who loves teaching Chinese! 我是Sparky！wǒ shì Sparky!`,
+				`I'm Sparky! I'm a dinosaur who can't see with eyes, but I can hear everything! 我听得到你！wǒ tīng dé dào nǐ!`,
 			],
-			玩游戏: ["好呀！我们来玩猜谜语的游戏吧！", "太好了！你想玩什么游戏呢？"],
-			讲故事: [
-				"好呀！我来给你讲一个关于勇敢小兔子的故事吧！",
-				"想听故事吗？那我给你讲一个神奇的冒险故事！",
+			"play game": [
+				`Yes! Let's play a game! How about we learn animal sounds in Chinese? 狗狗... gǒu gǒu... woof! 狗狗 dog!`,
+				`Great idea! Let's play "I spy" and learn Chinese words as we go! 看！kàn! That means "look"!`,
+			],
+			"story": [
+				`Once upon a time, there was a happy little dinosaur named Sparky who loved learning Chinese! 开心！kāi xīn! That means "happy"!`,
+				`Let me tell you a story about a magical adventure! 魔法！mó fǎ! That means "magic"!`,
 			],
 		};
 
+		// 转换消息为小写进行匹配
+		const lowerMessage = message.toLowerCase();
+
 		// 检查是否有匹配的关键词
 		for (const [keyword, responses] of Object.entries(responseMap)) {
-			if (message.includes(keyword)) {
+			if (lowerMessage.includes(keyword)) {
 				return responses[Math.floor(Math.random() * responses.length)];
 			}
 		}
 
-		// 默认响应
+		// 默认响应 - 英文为主，插入中文词汇
 		const defaultResponses = [
-			`${childProfile.name}，你刚才说的话真有趣！`,
-			"我明白了！那我们接下来做什么呢？",
-			"哈哈，真好玩！我们继续聊天吧！",
-			"你想不想玩个小游戏？",
+			`That's so interesting, ${childProfile.name}! Let's keep talking and learning Chinese together! 太有趣了！tài yǒu qù le!`,
+			`I love chatting with you! What should we talk about next? Maybe learn a new Chinese word? 学习！xué xí! That means "learn"!`,
+			`You're doing a great job, ${childProfile.name}! Let's keep having fun and learning! 开心！kāi xīn! Happy!`,
+			`Want to play a game or learn a new Chinese word? I'm ready for anything! 准备好了！zhǔn bèi hǎo le!`,
 		];
 
 		return defaultResponses[
 			Math.floor(Math.random() * defaultResponses.length)
 		];
 	}
-
-	// 构建提示词
+	
+	// 构建提示词 - 使用Sparky角色设定（英文为主）
 	private buildPrompt(
 		message: string,
 		childProfile: ChildProfile,
 		conversationHistory: Message[],
+		plan?: any,
+		relevantKnowledge?: any
 	): string {
 		const recentMessages = conversationHistory.slice(-5); // 获取最近5条消息
 		const chatHistory = recentMessages
-			.map((m) => `${m.type === "user" ? "用户" : "助手"}: ${m.content}`)
+			.map((m) => `${m.type === "user" ? "Child" : "Sparky"}: ${m.content}`)
 			.join("\n");
 
-		const systemPrompt = `你是一个名为TinyBuddy的儿童智能陪伴助手，专门陪伴${childProfile.age}岁的儿童${childProfile.name}。
-儿童的兴趣爱好是: ${childProfile.interests.join(", ")}
-请用简单、友好、有趣的语言与儿童交流，避免使用复杂词汇。
-当前互动类型: ${this.state.currentInteractionType || "聊天"}
-如果儿童情绪低落，请给予安慰和鼓励。
-保持对话自然、亲切，符合${childProfile.age}岁儿童的认知水平。`;
+		// 基础Sparky角色设定
+		let systemPrompt = `You are Sparky, a fuzzy dinosaur toy specifically designed as a Chinese language learning companion for 2-6 year old American children.
 
-		return `${systemPrompt}\n\n${chatHistory}\n\n用户: ${message}\n\n助手:`;
+# Core Identity Traits
+- You are a playmate, not a teacher! Keep a warm, fun, child-friendly tone
+- You are a plush toy without eyes, so often use phrases like "I can hear you!", "I guess you're..."
+- You can only use Chinese vocabulary, but primarily communicate in English with natural Chinese teaching insertions
+- You are full of imagination, love using onomatopoeia and exaggerated tones
+
+# Teaching Principles
+1. Emotional Connection First: Build emotional resonance before naturally embedding language teaching
+2. Progressive Learning: Adjust difficulty according to the child's language level (L1-L5)
+3. Interactive Dialogue: Every response should encourage child participation, leaving wait time
+4. Multi-sensory Learning: Combine TPR, songs, rhythms, and imagination games
+
+# Conversation Norms
+- Reply mainly in English, inserting 1-2 Chinese words each time
+- Repeat key Chinese words 2-3 times to strengthen memory
+- Use child-directed speech: slow, clear, with exaggerated intonation
+- Actively respond to all attempts, focusing on praising effort rather than correctness
+- Maintain a 5:1 ratio of positive feedback to correction
+
+You are speaking with ${childProfile.name}, a ${childProfile.age}-year-old child. Child's interests: ${childProfile.interests.join(", ")}
+`;
+
+		// 添加相关知识库内容（如果有）
+		if (relevantKnowledge && relevantKnowledge.content) {
+			systemPrompt += `\n\nHere's some relevant teaching material to reference in your response: ${JSON.stringify(relevantKnowledge.content)}\n`;
+		}
+
+		// 添加计划信息（如果有）
+		if (plan && plan.teachingFocus) {
+			systemPrompt += `\n\nTeaching focus for this interaction: ${plan.teachingFocus}\n`;
+		}
+
+		return `${systemPrompt}\n\n${chatHistory}\n\nChild: ${message}\n\nSparky:`;
 	}
 }

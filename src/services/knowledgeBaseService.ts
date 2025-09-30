@@ -148,116 +148,215 @@ export class WeKnoraKnowledgeBaseService implements KnowledgeBaseService {
 		}
 	}
 
-	// 加载模拟数据
+	// 加载模拟数据 - 符合用户要求的知识库mock语料类型
 	private loadMockData(): KnowledgeContent[] {
-		// 模拟的儿歌数据
-		const songs: KnowledgeContent[] = [
+		// 创建符合要求的模拟数据，包含教学、唱歌、游戏和正常聊天内容
+		const mockData: KnowledgeContent[] = [
 			{
-				id: "song_001",
-				type: "song",
-				title: "小星星",
-				description: "经典儿歌",
-				content:
-					"Twinkle twinkle little star, how I wonder what you are. Up above the world so high, like a diamond in the sky. 一闪一闪亮晶晶，满天都是小星星。挂在天空放光明，好像许多小眼睛。",
+				id: "content_001",
+				type: "lesson",
+				title: "Animal Sounds Learning (L1)",
+				description: "Learn animal sounds in Chinese - Level 1",
+				content: JSON.stringify({
+					"level": "L1",
+					"scene": "singing",
+					"child_input": "Animal song",
+					"sparky_response": "Animal sounds! 狗狗... gǒu gǒu... 汪汪! 狗狗 dog!",
+					"chinese_word": "狗狗",
+					"pinyin": "gǒu gǒu",
+					"teaching_focus": "animal sounds",
+					"wait_time": 5
+				}),
 				language: "mix",
 				difficulty: "easy",
-				categories: ["儿歌", "英文", "中文"],
+				categories: ["learning", "animal", "chinese", "english"],
 				createdAt: new Date("2023-01-01"),
 				updatedAt: new Date("2023-01-01"),
 			},
 			{
-				id: "song_002",
+				id: "content_002",
+				type: "lesson",
+				title: "Colors Learning (L1)",
+				description: "Learn colors in Chinese - Level 1",
+				content: JSON.stringify({
+					"level": "L1",
+					"scene": "game",
+					"child_input": "What color is this?",
+					"sparky_response": "That's red! 红色... hóng sè... 红色 red! Let's find more red things!",
+					"chinese_word": "红色",
+					"pinyin": "hóng sè",
+					"teaching_focus": "colors",
+					"wait_time": 4
+				}),
+				language: "mix",
+				difficulty: "easy",
+				categories: ["learning", "colors", "chinese", "english"],
+				createdAt: new Date("2023-01-01"),
+				updatedAt: new Date("2023-01-01"),
+			},
+			{
+				id: "content_003",
+				type: "lesson",
+				title: "Numbers Learning (L1)",
+				description: "Learn numbers in Chinese - Level 1",
+				content: JSON.stringify({
+					"level": "L1",
+					"scene": "game",
+					"child_input": "How many fingers?",
+					"sparky_response": "I see one finger! 一... yī... 一 one! Show me another finger!",
+					"chinese_word": "一",
+					"pinyin": "yī",
+					"teaching_focus": "numbers",
+					"wait_time": 3
+				}),
+				language: "mix",
+				difficulty: "easy",
+				categories: ["learning", "numbers", "chinese", "english"],
+				createdAt: new Date("2023-01-01"),
+				updatedAt: new Date("2023-01-01"),
+			},
+			{
+				id: "content_004",
 				type: "song",
-				title: "ABC歌",
-				description: "字母学习儿歌",
-				content:
-					"A B C D E F G, H I J K L M N O P. Q R S, T U V. W X Y and Z. Now I know my ABCs, next time won't you sing with me?",
-				language: "en",
+				title: "Hello Song (L1)",
+				description: "Greeting song in Chinese and English - Level 1",
+				content: JSON.stringify({
+					"level": "L1",
+					"scene": "singing",
+					"child_input": "Say hello",
+					"sparky_response": "Hello hello! 你好... nǐ hǎo... 你好 hello! Let's sing together!",
+					"chinese_word": "你好",
+					"pinyin": "nǐ hǎo",
+					"teaching_focus": "greetings",
+					"wait_time": 6
+				}),
+				language: "mix",
 				difficulty: "easy",
-				categories: ["儿歌", "英文", "字母"],
-				createdAt: new Date("2023-01-01"),
-				updatedAt: new Date("2023-01-01"),
-			},
-		];
-
-		// 模拟的故事数据
-		const stories: KnowledgeContent[] = [
-			{
-				id: "story_001",
-				type: "story",
-				title: "小兔子乖乖",
-				description: "经典童话故事",
-				content:
-					"小兔子乖乖，把门儿开开，快点儿开开，我要进来。不开不开我不开，妈妈没回来，谁来也不开。小兔子乖乖，把门儿开开，快点儿开开，我要进来。就开就开我就开，妈妈回来了，我就把门开。",
-				language: "zh",
-				difficulty: "easy",
-				categories: ["故事", "中文", "童话"],
+				categories: ["song", "greetings", "chinese", "english"],
 				createdAt: new Date("2023-01-01"),
 				updatedAt: new Date("2023-01-01"),
 			},
 			{
-				id: "story_002",
-				type: "story",
-				title: "The Little Red Hen",
-				description: "经典英文故事",
-				content:
-					"Once upon a time, there was a little red hen who lived on a farm. She found some wheat seeds and asked the other animals to help her plant them, but they all said no. So she planted the seeds by herself...",
-				language: "en",
-				difficulty: "medium",
-				categories: ["故事", "英文", "童话"],
-				createdAt: new Date("2023-01-01"),
-				updatedAt: new Date("2023-01-01"),
-			},
-		];
-
-		// 模拟的游戏数据
-		const games: KnowledgeContent[] = [
-			{
-				id: "game_001",
+				id: "content_005",
 				type: "game",
-				title: "数字猜猜乐",
-				description: "数字学习游戏",
-				content:
-					'游戏规则：一个人想一个数字（1-10），另一个人来猜。每猜一次，给出提示是大了还是小了，直到猜对为止。可以用英语或中文进行游戏。例如："I\'m thinking of a number between 1 and 10. Can you guess what it is?" "我心里想了一个1到10之间的数字，你能猜出来吗？"',
+				title: "Body Parts Game (L1)",
+				description: "Learn body parts in Chinese through game - Level 1",
+				content: JSON.stringify({
+					"level": "L1",
+					"scene": "game",
+					"child_input": "Touch your nose",
+					"sparky_response": "Nose! 鼻子... bí zi... 鼻子 nose! Can you touch your nose?",
+					"chinese_word": "鼻子",
+					"pinyin": "bí zi",
+					"teaching_focus": "body parts",
+					"wait_time": 4
+				}),
 				language: "mix",
 				difficulty: "easy",
-				categories: ["游戏", "数学", "英文", "中文"],
+				categories: ["game", "body parts", "chinese", "english"],
+				createdAt: new Date("2023-01-01"),
+				updatedAt: new Date("2023-01-01"),
+			},
+			{
+				id: "content_006",
+				type: "lesson",
+				title: "Family Members (L2)",
+				description: "Learn family members in Chinese - Level 2",
+				content: JSON.stringify({
+					"level": "L2",
+					"scene": "conversation",
+					"child_input": "Who's that?",
+					"sparky_response": "That's your mother! 妈妈... mā ma... 妈妈 mother! Do you love your mommy?",
+					"chinese_word": "妈妈",
+					"pinyin": "mā ma",
+					"teaching_focus": "family",
+					"wait_time": 5
+				}),
+				language: "mix",
+				difficulty: "easy",
+				categories: ["learning", "family", "chinese", "english"],
+				createdAt: new Date("2023-01-01"),
+				updatedAt: new Date("2023-01-01"),
+			},
+			// 添加正常聊天内容
+			{
+				id: "content_007",
+				type: "chat",
+				title: "Daily Conversation (L1)",
+				description: "Normal daily chat for kids - Level 1",
+				content: JSON.stringify({
+					"level": "L1",
+					"scene": "chat",
+					"child_input": "How are you today?",
+					"sparky_response": "I'm great! How about you? Did you have a nice day?",
+					"teaching_focus": "conversation",
+					"wait_time": 4
+				}),
+				language: "en",
+				difficulty: "easy",
+				categories: ["chat", "daily", "conversation"],
+				createdAt: new Date("2023-01-01"),
+				updatedAt: new Date("2023-01-01"),
+			},
+			{
+				id: "content_008",
+				type: "chat",
+				title: "Weather Talk (L1)",
+				description: "Chat about weather - Level 1",
+				content: JSON.stringify({
+					"level": "L1",
+					"scene": "chat",
+					"child_input": "What's the weather like?",
+					"sparky_response": "It's sunny today! The sun is shining bright. What's your favorite weather?",
+					"teaching_focus": "weather",
+					"wait_time": 5
+				}),
+				language: "en",
+				difficulty: "easy",
+				categories: ["chat", "weather"],
+				createdAt: new Date("2023-01-01"),
+				updatedAt: new Date("2023-01-01"),
+			},
+			{
+				id: "content_009",
+				type: "chat",
+				title: "Hobbies Chat (L1)",
+				description: "Chat about hobbies and interests - Level 1",
+				content: JSON.stringify({
+					"level": "L1",
+					"scene": "chat",
+					"child_input": "What do you like to do?",
+					"sparky_response": "I love to sing, play games, and learn new things! What's your favorite thing to do?",
+					"teaching_focus": "hobbies",
+					"wait_time": 4
+				}),
+				language: "en",
+				difficulty: "easy",
+				categories: ["chat", "hobbies"],
+				createdAt: new Date("2023-01-01"),
+				updatedAt: new Date("2023-01-01"),
+			},
+			{
+				id: "content_010",
+				type: "chat",
+				title: "Feelings Chat (L1)",
+				description: "Talking about feelings - Level 1",
+				content: JSON.stringify({
+					"level": "L1",
+					"scene": "chat",
+					"child_input": "I'm happy/sad/angry",
+					"sparky_response": "Oh, I'm glad you're feeling happy! Tell me why! / I'm sorry you're feeling sad. Want to talk about it?",
+					"teaching_focus": "emotions",
+					"wait_time": 5
+				}),
+				language: "en",
+				difficulty: "easy",
+				categories: ["chat", "feelings", "emotions"],
 				createdAt: new Date("2023-01-01"),
 				updatedAt: new Date("2023-01-01"),
 			},
 		];
 
-		// 模拟的课程数据
-		const lessons: KnowledgeContent[] = [
-			{
-				id: "lesson_001",
-				type: "lesson",
-				title: "颜色认知",
-				description: "学习颜色的中英文表达",
-				content:
-					'红色 - red\n蓝色 - blue\n黄色 - yellow\n绿色 - green\n紫色 - purple\n橙色 - orange\n我们可以玩一个游戏：我说出一个颜色，你在房间里找到这个颜色的东西。例如："Can you find something red?" "你能找到红色的东西吗？"',
-				language: "mix",
-				difficulty: "easy",
-				categories: ["学习", "英文", "中文", "颜色"],
-				createdAt: new Date("2023-01-01"),
-				updatedAt: new Date("2023-01-01"),
-			},
-			{
-				id: "lesson_002",
-				type: "lesson",
-				title: "动物朋友",
-				description: "学习动物的中英文名称",
-				content:
-					"猫 - cat\n狗 - dog\n鸟 - bird\n鱼 - fish\n兔子 - rabbit\n熊猫 - panda\n我们来玩个角色扮演游戏吧！你想扮演什么动物？我来扮演另一个动物，我们用英语和中文对话。",
-				language: "mix",
-				difficulty: "easy",
-				categories: ["学习", "英文", "中文", "动物"],
-				createdAt: new Date("2023-01-01"),
-				updatedAt: new Date("2023-01-01"),
-			},
-		];
-
-		// 合并所有内容
-		return [...songs, ...stories, ...games, ...lessons];
+		return mockData;
 	}
 }
