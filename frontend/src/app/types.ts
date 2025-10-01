@@ -6,7 +6,8 @@ export interface Message {
 
 // WebSocket消息数据接口
 export interface WebSocketMessageData {
-  content: string;
+  type: string;
+  userInput: string;
 }
 
 // 配置参数接口

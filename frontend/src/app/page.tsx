@@ -1,5 +1,6 @@
-import Image from "next/image";
+'use client';
 
+import Image from "next/image";
 import React, { useState, useEffect, useRef } from 'react';
 import { Message, WebSocketMessageData } from './types';
 
@@ -22,7 +23,7 @@ export default function ChatInterface() {
   useEffect(() => {
     if (childID && prompt) {
       // 创建WebSocket连接
-      const ws = new WebSocket(`ws://localhost:8080?childID=${childID}&prompt=${encodeURIComponent(prompt)}`);
+      const ws = new WebSocket(`ws://localhost:3143?childID=${childID}&prompt=${encodeURIComponent(prompt)}`);
       
       // 连接打开时的处理
       ws.onopen = () => {
@@ -34,7 +35,9 @@ export default function ChatInterface() {
       // 接收消息的处理
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        setMessages(prev => [...prev, { sender: 'AI', content: data.content }]);
+        // 根据消息类型和字段选择合适的内容
+        const content = data.content || data.message || '未知消息';
+        setMessages(prev => [...prev, { sender: 'AI', content: content }]);
       };
 
       // 连接关闭的处理
@@ -65,7 +68,7 @@ export default function ChatInterface() {
       const message = chatMessage.trim();
       
       // 创建符合类型定义的消息对象
-      const wsMessage: WebSocketMessageData = { content: message };
+      const wsMessage: WebSocketMessageData = { type: 'user_input', userInput: message };
       
       // 发送消息到服务器
       socket.send(JSON.stringify(wsMessage));
