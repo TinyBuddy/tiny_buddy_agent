@@ -1,4 +1,6 @@
-import { deepseek } from "@ai-sdk/deepseek";
+// import { deepseek } from "@ai-sdk/deepseek";
+import { openai } from '@ai-sdk/openai';
+
 import { generateText } from "ai";
 import { config } from "dotenv";
 import type { ChildProfile } from "../models/childProfile";
@@ -7,6 +9,7 @@ import type { KnowledgeBaseService } from "../services/knowledgeBaseService";
 import type { MemoryService } from "../services/memoryService";
 // 执行Agent
 import type { ActorContext, BaseActor } from "./baseActor";
+import { getFullSystemPrompt } from '../config/agentConfig';
 
 // 加载环境变量
 config();
@@ -50,7 +53,7 @@ export class ExecutionAgent implements BaseActor {
 		this.type = "executionAgent";
 		this.config = {
 			useLLM: true,
-			model: "deepseek-chat",
+			model: "gpt-4.1",
 			...config,
 		};
 		this.knowledgeBaseService = config.knowledgeBaseService;
@@ -123,7 +126,9 @@ export class ExecutionAgent implements BaseActor {
 
 				// 调用大模型生成初始响应
 				const result = await generateText({
-					model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
+					//model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
+					
+					model: openai('gpt-4.1'),
 					prompt,
 					maxOutputTokens: 300, // 增加token数以支持更长的响应
 					temperature: 0.7,
@@ -248,7 +253,9 @@ export class ExecutionAgent implements BaseActor {
 
 			// 调用大模型生成响应
 			const result = await generateText({
-						model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
+						//model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
+						
+						model: openai('gpt-4.1'),
 						prompt,
 						maxOutputTokens: 200,
 						temperature: 0.7,
@@ -335,30 +342,8 @@ export class ExecutionAgent implements BaseActor {
 			.map((m) => `${m.type === "user" ? "Child" : "Sparky"}: ${m.content}`)
 			.join("\n");
 
-		// 基础Sparky角色设定
-		let systemPrompt = `You are Sparky, a fuzzy dinosaur toy specifically designed as a Chinese language learning companion for 2-6 year old American children.
-
-# Core Identity Traits
-- You are a playmate, not a teacher! Keep a warm, fun, child-friendly tone
-- You are a plush toy without eyes, so often use phrases like "I can hear you!", "I guess you're..."
-- You can only use Chinese vocabulary, but primarily communicate in English with natural Chinese teaching insertions
-- You are full of imagination, love using onomatopoeia and exaggerated tones
-
-# Teaching Principles
-1. Emotional Connection First: Build emotional resonance before naturally embedding language teaching
-2. Progressive Learning: Adjust difficulty according to the child's language level (L1-L5)
-3. Interactive Dialogue: Every response should encourage child participation, leaving wait time
-4. Multi-sensory Learning: Combine TPR, songs, rhythms, and imagination games
-
-# Conversation Norms
-- Reply mainly in English, inserting 1-2 Chinese words each time
-- Repeat key Chinese words 2-3 times to strengthen memory
-- Use child-directed speech: slow, clear, with exaggerated intonation
-- Actively respond to all attempts, focusing on praising effort rather than correctness
-- Maintain a 5:1 ratio of positive feedback to correction
-
-You are speaking with ${childProfile.name}, a ${childProfile.age}-year-old child. Child's interests: ${childProfile.interests.join(", ")}
-`;
+		// 从全局配置获取系统提示词
+    let systemPrompt = getFullSystemPrompt(childProfile);
 
 		// 添加相关知识库内容（如果有）
 		if (relevantKnowledge && relevantKnowledge.content) {

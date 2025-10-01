@@ -65,7 +65,7 @@ async function startApplication() {
 			console.log("WebSocket服务器启动成功");
 		} catch (serverError) {
 			console.error("服务器启动失败:", serverError);
-			console.error("错误详情:", serverError.stack);
+			console.error("错误详情:", serverError instanceof Error ? serverError.stack : "未知错误");
 		}
 
 		console.log("=== TinyBuddy应用已成功启动 ===");

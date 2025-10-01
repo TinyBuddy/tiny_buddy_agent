@@ -2,6 +2,7 @@ import WebSocket, { WebSocketServer } from "ws";
 import app from "../app";
 import type { ChildProfile } from "../models/childProfile";
 import { createDefaultChildProfile } from "../models/childProfile";
+import { updateSystemPromptTemplate } from '../config/agentConfig';
 
 // WebSocket连接管理器
 class WebSocketConnectionManager {
@@ -72,6 +73,9 @@ class WebSocketMessageHandler {
 					break;
 				case "check_connection":
 					await this.handleConnectionCheck(ws);
+					break;
+				case "update_prompt":
+					await this.handleUpdatePrompt(ws, parsedMessage);
 					break;
 				default:
 					console.warn(`未知的消息类型: ${parsedMessage.type}`);
@@ -195,6 +199,47 @@ class WebSocketMessageHandler {
 					}),
 				);
 			}
+		}
+	}
+
+	private async handleUpdatePrompt(
+		ws: WebSocket,
+		message: { type: string; prompt?: string },
+	): Promise<void> {
+		try {
+			const { prompt } = message;
+			
+			if (prompt === undefined) {
+				ws.send(
+					JSON.stringify({
+						type: "error",
+						message: "prompt参数不能为空",
+					}),
+				);
+				return;
+			}
+			
+			// 更新全局提示词
+		updateSystemPromptTemplate(prompt);
+			
+			console.log("系统提示词已更新");
+			
+			// 返回更新成功消息
+			ws.send(
+				JSON.stringify({
+					type: "prompt_updated",
+					message: "系统提示词已成功更新",
+					timestamp: new Date().toISOString(),
+				}),
+			);
+		} catch (error) {
+			console.error("更新系统提示词时出错:", error);
+			ws.send(
+				JSON.stringify({
+					type: "error",
+					message: `更新系统提示词时出错: ${error instanceof Error ? error.message : "未知错误"}`,
+				}),
+			);
 		}
 	}
 
