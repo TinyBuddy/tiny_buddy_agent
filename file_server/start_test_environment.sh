@@ -40,7 +40,7 @@ fi
 
 echo -e "${BLUE}启动Nginx容器...${NC}"
 docker run -d --name file-server \
-  -p 8080:8080 \
+  -p 8080:80 \
   -v $(pwd):/usr/share/nginx/html \
   -v $(pwd)/nginx.conf:/etc/nginx/nginx.conf \
   nginx
