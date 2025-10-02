@@ -1,0 +1,20 @@
+{
+  "name": "file-server-uploader",
+  "version": "1.0.0",
+  "description": "Simple file upload server for Nginx file server",
+  "main": "upload_server.js",
+  "scripts": {
+    "start": "node upload_server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "formidable": "^3.5.1"
+  },
+  "keywords": [
+    "file",
+    "server",
+    "upload"
+  ],
+  "author": "",
+  "license": "ISC"
+}

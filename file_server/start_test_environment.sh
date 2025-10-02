@@ -1,147 +1,102 @@
 #!/bin/bash
 
-# 启动WebSocket代理测试环境脚本
-# 这个脚本会：
-# 1. 安装必要的Node.js依赖
-# 2. 在后台启动WebSocket测试服务器
-# 3. 启动Nginx容器
-# 4. 显示测试说明
+# 启动测试环境脚本
+# 这个脚本会帮助用户快速设置和测试文件上传和下载功能
 
 # 设置颜色变量
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
+YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # 无颜色
 
-# 检查当前目录
-if [ ! -f "websocket_test_server.js" ]; then
-    echo -e "${RED}错误: 请在file_server目录下运行此脚本${NC}"
+# 创建upload目录（如果不存在）
+mkdir -p upload
+
+# 安装文件上传服务器依赖
+if [ -f "package.json" ]; then
+    echo -e "${BLUE}安装文件上传服务器依赖...${NC}"
+    npm install
+else
+    echo -e "${RED}错误: 未找到package.json文件${NC}"
     exit 1
 fi
 
-# 检查Node.js是否安装
-if ! command -v node &> /dev/null; then
-    echo -e "${RED}错误: 未找到Node.js。请先安装Node.js。${NC}"
-    exit 1
-fi
+# 启动文件上传服务器
+echo -e "${BLUE}启动文件上传服务器...${NC}"
+nohup node upload_server.js > upload_server.log 2>&1 &
+UPLOAD_SERVER_PID=$!
 
-# 检查npm是否安装
-if ! command -v npm &> /dev/null; then
-    echo -e "${RED}错误: 未找到npm。请先安装npm。${NC}"
-    exit 1
-fi
-
-# 检查Docker是否安装
-if ! command -v docker &> /dev/null; then
-    echo -e "${RED}错误: 未找到Docker。请先安装Docker。${NC}"
-    exit 1
-fi
-
-# 检查Docker服务是否运行
-if ! docker info &> /dev/null; then
-    echo -e "${RED}错误: Docker服务未运行。请先启动Docker服务。${NC}"
-    exit 1
-fi
-
-# 创建package.json文件（如果不存在）
-if [ ! -f "package.json" ]; then
-    echo -e "${BLUE}创建package.json文件...${NC}"
-    cat > package.json << EOL
-{
-  "name": "websocket-test-server",
-  "version": "1.0.0",
-  "description": "简单的WebSocket测试服务器",
-  "main": "websocket_test_server.js",
-  "scripts": {
-    "start": "node websocket_test_server.js"
-  },
-  "dependencies": {
-    "ws": "^8.18.0"
-  }
-}
-EOL
-fi
-
-# 安装依赖
-echo -e "${BLUE}安装Node.js依赖...${NC}"
-npm install
-
-# 停止并删除已存在的Nginx容器
-if [ "$(docker ps -aq -f name=nginx-file-server)" ]; then
-    echo -e "${YELLOW}停止并删除已存在的Nginx容器...${NC}"
-    docker stop nginx-file-server > /dev/null
-    docker rm nginx-file-server > /dev/null
-fi
-
-# 在后台启动WebSocket测试服务器
-echo -e "${BLUE}启动WebSocket测试服务器...${NC}"
-nohup node websocket_test_server.js > websocket_server.log 2>&1 &
-
-# 等待WebSocket服务器启动
+# 等待上传服务器启动
 sleep 2
 
-# 启动Nginx容器
+# 运行Nginx容器
+# 首先停止并删除现有的容器（如果存在）
+if [ "$(docker ps -q -f name=file-server)" ]; then
+    echo -e "${BLUE}停止并删除现有的file-server容器...${NC}"
+    docker stop file-server
+    docker rm file-server
+fi
+
 echo -e "${BLUE}启动Nginx容器...${NC}"
-docker run -d --name nginx-file-server \
+docker run -d --name file-server \
   -p 8080:8080 \
-  -v "$(pwd)":/usr/share/nginx/html \
-  -v "$(pwd)/nginx.conf":/etc/nginx/nginx.conf \
-  nginx:latest > /dev/null
+  -v $(pwd):/usr/share/nginx/html \
+  -v $(pwd)/nginx.conf:/etc/nginx/nginx.conf \
+  nginx
 
-# 等待Nginx容器启动
-sleep 2
+# 等待容器启动
+sleep 3
 
-# 显示测试说明
+# 显示测试环境信息
 clear
 echo -e "${GREEN}======================================${NC}"
-echo -e "${GREEN}  WebSocket代理测试环境已启动！  ${NC}"
+echo -e "${GREEN}        文件服务器测试环境已启动！        ${NC}"
 echo -e "${GREEN}======================================${NC}"
 echo -e "\n${YELLOW}测试组件:${NC}"
-echo -e "1. WebSocket测试服务器: 运行在本地端口8081"
-echo -e "2. Nginx代理服务器: 运行在本地端口8080"
-echo -e "3. WebSocket代理路径: http://localhost:8080/proxy"
+echo -e "1. 文件上传服务器: 运行在本地端口8082"
+echo -e "2. Nginx文件服务器: 运行在本地端口8080"
 
 echo -e "\n${YELLOW}测试方法:${NC}"
-echo -e "1. 使用浏览器访问 WebSocket测试页面: http://localhost:8080/websocket_test.html"
-echo -e "   - 默认WebSocket URL: ws://localhost:8080/proxy"
-echo -e "   - 点击'连接'按钮测试WebSocket代理连接"
-echo -e "   - 连接成功后，可以发送消息测试双向通信"
-
-echo -e "2. 直接测试HTTP代理: http://localhost:8080/proxy"
+echo -e "1. 使用浏览器访问 文件上传页面: http://localhost:8080"
+echo -e "   - 在文件上传区域选择文件"
+echo -e "   - 点击开始上传"
+echo -e "   - 上传成功后，文件会显示在文件列表中"
+echo -e "   - 点击下载按钮可以下载文件"
 
 echo -e "\n${YELLOW}查看日志:${NC}"
-echo -e "- WebSocket服务器日志: tail -f websocket_server.log"
-echo -e "- Nginx容器日志: docker logs nginx-file-server"
+echo -e "- 文件上传服务器日志: tail -f upload_server.log"
+echo -e "- Nginx容器日志: docker logs file-server"
 
 echo -e "\n${YELLOW}停止测试环境:${NC}"
-echo -e "- 停止WebSocket服务器: pkill -f websocket_test_server.js"
-echo -e "- 停止Nginx容器: docker stop nginx-file-server"
+echo -e "- 停止文件上传服务器: kill $UPLOAD_SERVER_PID"
+echo -e "- 停止Nginx容器: docker stop file-server"
+echo -e "\n${BLUE}注意：上传的文件保存在 upload 目录中${NC}"
 echo -e "\n${BLUE}祝您测试愉快！${NC}"
 
-# 显示WebSocket服务器日志的最后几行
-echo -e "\n${YELLOW}WebSocket服务器日志:${NC}"
-tail -n 5 websocket_server.log
+echo -e "\n${YELLOW}文件上传服务器日志:${NC}"
+tail -n 5 upload_server.log
 
 # 检查Nginx容器是否正常运行
-if [ "$(docker ps -q -f name=nginx-file-server)" ]; then
+if [ "$(docker ps -q -f name=file-server)" ]; then
     echo -e "\n${GREEN}Nginx容器启动成功！${NC}"
 else
-    echo -e "\n${RED}Nginx容器启动失败，请检查配置。${NC}"
-    echo -e "${RED}查看错误日志: docker logs nginx-file-server${NC}"
+    echo -e "\n${RED}Nginx容器启动失败！${NC}"
+    echo -e "${RED}请查看Docker日志: docker logs file-server${NC}"
+    # 停止文件上传服务器
+    kill $UPLOAD_SERVER_PID
+    exit 1
 fi
 
-# 提示用户可以访问测试页面
-read -p "\n按Enter键在浏览器中打开测试页面..." open_browser
-
+# 自动打开浏览器
 # 在macOS上打开浏览器
 if [[ "$(uname)" == "Darwin" ]]; then
-    open http://localhost:8080/websocket_test.html
+    open http://localhost:8080
 # 在Linux上打开浏览器
 elif [[ "$(uname)" == "Linux" ]]; then
     if command -v xdg-open &> /dev/null; then
-        xdg-open http://localhost:8080/websocket_test.html
+        xdg-open http://localhost:8080
     elif command -v gnome-open &> /dev/null; then
-        gnome-open http://localhost:8080/websocket_test.html
+        gnome-open http://localhost:8080
     fi
 fi
