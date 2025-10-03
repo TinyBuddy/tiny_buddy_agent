@@ -1,0 +1,23 @@
+nohup npm run dev </dev/null > dev.log 2>&1 &
+exit
+
+
+
+nohup ./main </dev/null > dev.log 2>&1 &
+exit
+
+nohup npm start </dev/null > dev.log 2>&1 &
+exit
+
+
+
+https://stg.tinybuddy.dev/api/devices/94a99031b91c/check-upgrade
+
+
+47.250.116.113
+
+http://47.250.116.113/api/devices/94a99031b91c/check-upgrade
+
+
+
+我想通过nginx配置代理访问wss://stg.tinybuddy.dev/hardware

@@ -12,8 +12,14 @@ const ws = new WebSocket(proxyWsUrl);
 ws.on('open', () => {
   console.log('WebSocket连接已成功建立');
   
-  // 可以在这里发送测试消息到服务器
-  // ws.send(JSON.stringify({ test: 'hello from client' }));
+  // 发送测试消息到服务器
+  try {
+    const testMessage = JSON.stringify({ test: 'Hello from proxy test client' });
+    ws.send(testMessage);
+    console.log('已发送测试消息到代理服务器');
+  } catch (error) {
+    console.error('发送测试消息失败:', error);
+  }
 });
 
 // 接收消息时的处理
