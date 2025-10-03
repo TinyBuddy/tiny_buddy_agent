@@ -13,7 +13,7 @@ export interface WebSocketMessageData {
 
 // 更新提示词消息接口
 export interface UpdatePromptMessageData {
-  type: 'update_prompt';
+  type: "update_prompt";
   prompt: string;
 }
 

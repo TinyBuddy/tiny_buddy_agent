@@ -1,7 +1,7 @@
-import app, { TinyBuddyApp } from "./app";
+import app, { type TinyBuddyApp } from "./app";
 import type { ChildProfile } from "./models/childProfile";
-import type { Message } from "./models/message";
 import type { KnowledgeContent } from "./models/content";
+import type { Message } from "./models/message";
 
 /**
  * TinyBuddy SDK
@@ -15,7 +15,7 @@ export class TinyBuddySDK {
    * 初始化TinyBuddy SDK
    * @param childId 儿童ID
    */
-  constructor(childId: string = "default_child") {
+  constructor(childId = "default_child") {
     this.app = app;
     this.childId = childId;
   }
@@ -27,12 +27,15 @@ export class TinyBuddySDK {
   async init(): Promise<{ success: boolean; message: string }> {
     try {
       await this.app.init();
-      return { success: true, message: "TinyBuddy SDK initialized successfully" };
+      return {
+        success: true,
+        message: "TinyBuddy SDK initialized successfully",
+      };
     } catch (error) {
       console.error("SDK initialization failed:", error);
       return {
         success: false,
-        message: `Initialization failed: ${error instanceof Error ? error.message : "unknown error"}`
+        message: `Initialization failed: ${error instanceof Error ? error.message : "unknown error"}`,
       };
     }
   }
@@ -70,7 +73,9 @@ export class TinyBuddySDK {
    * @param profile 要更新的档案信息
    * @returns 更新后的儿童档案
    */
-  async updateChildProfile(profile: Partial<ChildProfile>): Promise<ChildProfile> {
+  async updateChildProfile(
+    profile: Partial<ChildProfile>,
+  ): Promise<ChildProfile> {
     try {
       return await this.app.updateChildProfile(this.childId, profile);
     } catch (error) {
@@ -110,7 +115,9 @@ export class TinyBuddySDK {
    * @param content 知识库内容对象
    * @returns 添加结果
    */
-  async addKnowledgeContent(content: Omit<KnowledgeContent, "id" | "createdAt">): Promise<{ success: boolean; message: string }> {
+  async addKnowledgeContent(
+    content: Omit<KnowledgeContent, "id" | "createdAt">,
+  ): Promise<{ success: boolean; message: string }> {
     try {
       await this.app.addKnowledgeContent(content);
       return { success: true, message: "Knowledge content added successfully" };
@@ -118,7 +125,7 @@ export class TinyBuddySDK {
       console.error("Failed to add knowledge content:", error);
       return {
         success: false,
-        message: `Failed to add knowledge content: ${error instanceof Error ? error.message : "unknown error"}`
+        message: `Failed to add knowledge content: ${error instanceof Error ? error.message : "unknown error"}`,
       };
     }
   }
@@ -149,14 +156,16 @@ export class TinyBuddySDK {
  * @param childId 可选的儿童ID
  * @returns TinyBuddy SDK实例
  */
-export async function createTinyBuddySDK(childId?: string): Promise<TinyBuddySDK> {
+export async function createTinyBuddySDK(
+  childId?: string,
+): Promise<TinyBuddySDK> {
   const sdk = new TinyBuddySDK(childId || "default_child");
   const initResult = await sdk.init();
-  
+
   if (!initResult.success) {
     console.warn("SDK initialization has warning:", initResult.message);
   }
-  
+
   return sdk;
 }
 

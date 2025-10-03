@@ -17,6 +17,7 @@
 前端可以通过发送WebSocket消息来完全替换系统提示词。具体格式如下：
 
 ### 消息格式
+
 ```json
 {
   "type": "update_prompt",
@@ -25,14 +26,17 @@
 ```
 
 ### 示例代码（前端）
+
 ```javascript
 // 假设已有WebSocket连接实例 ws
 
 // 发送更新提示词的消息
-ws.send(JSON.stringify({
-  type: "update_prompt",
-  prompt: "你的全新系统提示词"
-}));
+ws.send(
+  JSON.stringify({
+    type: "update_prompt",
+    prompt: "你的全新系统提示词",
+  }),
+);
 
 // 监听服务器响应
 ws.onmessage = (event) => {
@@ -56,12 +60,14 @@ ws.onmessage = (event) => {
 ## 示例效果
 
 原始提示词：
+
 ```
 You are Sparky, a fuzzy dinosaur toy specifically designed as a Chinese language learning companion for 2-6 year old American children.
 ...
 ```
 
 更新后提示词：
+
 ```
 [你在前端输入的全新系统提示词]
 ```

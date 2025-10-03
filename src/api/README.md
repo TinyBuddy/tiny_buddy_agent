@@ -15,6 +15,7 @@ TinyBuddy 提供了一套 RESTful API，允许外部系统通过 HTTP 请求与�
 用于检查服务器是否正常运行的简单端点。
 
 **响应示例：**
+
 ```json
 {
   "status": "ok",
@@ -30,10 +31,12 @@ TinyBuddy 提供了一套 RESTful API，允许外部系统通过 HTTP 请求与�
 向指定儿童发送聊天消息并获取回复。
 
 **请求参数：**
+
 - `childId` (可选): 儿童 ID，默认为 `default_child`
 - `message`: 聊天消息内容
 
 **请求示例：**
+
 ```json
 {
   "childId": "default_child",
@@ -42,6 +45,7 @@ TinyBuddy 提供了一套 RESTful API，允许外部系统通过 HTTP 请求与�
 ```
 
 **响应示例：**
+
 ```json
 {
   "success": true,
@@ -60,9 +64,11 @@ TinyBuddy 提供了一套 RESTful API，允许外部系统通过 HTTP 请求与�
 获取指定儿童的对话历史记录。
 
 **参数：**
+
 - `childId` (可选): 儿童 ID，默认为 `default_child`
 
 **响应示例：**
+
 ```json
 {
   "success": true,
@@ -96,9 +102,11 @@ TinyBuddy 提供了一套 RESTful API，允许外部系统通过 HTTP 请求与�
 清空指定儿童的对话历史记录。
 
 **参数：**
+
 - `childId` (可选): 儿童 ID，默认为 `default_child`
 
 **响应示例：**
+
 ```json
 {
   "success": true,
@@ -114,9 +122,11 @@ TinyBuddy 提供了一套 RESTful API，允许外部系统通过 HTTP 请求与�
 获取指定儿童的档案信息。
 
 **参数：**
+
 - `childId` (可选): 儿童 ID，默认为 `default_child`
 
 **响应示例：**
+
 ```json
 {
   "success": true,
@@ -142,9 +152,11 @@ TinyBuddy 提供了一套 RESTful API，允许外部系统通过 HTTP 请求与�
 更新指定儿童的档案信息。
 
 **参数：**
+
 - `childId` (可选): 儿童 ID，默认为 `default_child`
 
 **请求示例：**
+
 ```json
 {
   "name": "小明",
@@ -154,6 +166,7 @@ TinyBuddy 提供了一套 RESTful API，允许外部系统通过 HTTP 请求与�
 ```
 
 **响应示例：**
+
 ```json
 {
   "success": true,
@@ -179,9 +192,11 @@ TinyBuddy 提供了一套 RESTful API，允许外部系统通过 HTTP 请求与�
 分析并获取指定儿童的兴趣爱好。
 
 **参数：**
+
 - `childId` (可选): 儿童 ID，默认为 `default_child`
 
 **响应示例：**
+
 ```json
 {
   "success": true,
@@ -195,11 +210,13 @@ TinyBuddy 提供了一套 RESTful API，允许外部系统通过 HTTP 请求与�
 ## 错误处理
 
 API 使用标准的 HTTP 状态码来表示请求的结果：
+
 - `200 OK`: 请求成功
 - `400 Bad Request`: 请求参数错误
 - `500 Internal Server Error`: 服务器内部错误
 
 错误响应格式：
+
 ```json
 {
   "success": false,

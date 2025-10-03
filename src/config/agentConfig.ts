@@ -42,7 +42,7 @@ export const resetSystemPromptTemplate = (): void => {
 // 获取完整的系统提示词（包含儿童信息）
 export const getFullSystemPrompt = (childProfile: any): string => {
   return currentSystemPromptTemplate
-    .replace('{{childName}}', childProfile.name)
-    .replace('{{childAge}}', childProfile.age.toString())
-    .replace('{{childInterests}}', childProfile.interests.join(', '));
+    .replace("{{childName}}", childProfile.name)
+    .replace("{{childAge}}", childProfile.age.toString())
+    .replace("{{childInterests}}", childProfile.interests.join(", "));
 };
