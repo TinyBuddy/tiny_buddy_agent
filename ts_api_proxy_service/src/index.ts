@@ -176,30 +176,188 @@ function handleWebSocketConnection(ws: WebSocket, req: Request) {
   
   console.log(`WebSocket代理连接到: ${targetUrl}`);
   
-  // 连接到目标WebSocket服务器 - 简化配置以匹配直接测试成功的配置
-  const targetWs = new WebSocket(targetUrl);
+  // 确保客户端WebSocket配置正确
+  console.log(`[${new Date().toISOString()}] 客户端WebSocket binaryType: ${ws.binaryType}`);
+  
+  // 使用与direct-ws-test.ts完全相同的配置
+  const targetWs = new WebSocket(targetUrl, {
+    headers: {
+      'User-Agent': 'Direct-WS-Test/1.0'
+    }
+  });
+  
+  // 设置binaryType，确保与客户端配置一致
+  targetWs.binaryType = ws.binaryType;
+  console.log(`[${new Date().toISOString()}] 目标WebSocket binaryType设置为: ${targetWs.binaryType}`);
+  
+  // 添加目标服务器连接状态日志
+  targetWs.on('open', () => {
+    console.log(`[${new Date().toISOString()}] 目标WebSocket服务器连接已建立`);
+  });
+
+  // 确保消息监听器正确注册
+  console.log(`[${new Date().toISOString()}] 目标服务器消息监听器已注册`);
+  
+  // 为targetWs添加额外的状态检查
+  console.log(`[${new Date().toISOString()}] 初始化后targetWs状态: ${targetWs.readyState}`);
   
   // 处理目标服务器消息
-  targetWs.on('message', (data) => {
+  targetWs.on('message', (data: any) => {
+    console.log(`[${new Date().toISOString()}] ✅ 目标服务器消息事件被触发！`);
+    console.log(`[${new Date().toISOString()}] 目标服务器消息数据类型: ${typeof data}`);
+    console.log(`[${new Date().toISOString()}] 目标服务器消息是否为Buffer: ${data instanceof Buffer}`);
+    console.log(`[${new Date().toISOString()}] 目标服务器消息是否为ArrayBuffer: ${data instanceof ArrayBuffer}`);
+    
+    // 计算数据长度和尝试解析消息内容以进行调试
+    let dataLength = 0;
+    let messageContent = '';
+    let parsedData = null;
+    let dataString = '';
+    
+    try {
+      // 确保数据被转换为字符串，模仿direct-ws-test.ts的行为
+      if (typeof data === 'string') {
+        dataLength = data.length;
+        dataString = data;
+        messageContent = data.substring(0, 200); // 显示更多字符以便调试
+        try {
+          parsedData = JSON.parse(data);
+          console.log(`[${new Date().toISOString()}] 成功解析JSON消息: ${JSON.stringify(parsedData)}`);
+        } catch (parseError) {
+          console.log(`[${new Date().toISOString()}] 消息不是有效的JSON`);
+        }
+      } else if (data instanceof Buffer) {
+        dataLength = data.length;
+        dataString = data.toString('utf8');
+        messageContent = dataString.substring(0, 200);
+        try {
+          parsedData = JSON.parse(dataString);
+          console.log(`[${new Date().toISOString()}] 成功解析Buffer为JSON: ${JSON.stringify(parsedData)}`);
+        } catch (parseError) {
+          console.log(`[${new Date().toISOString()}] Buffer不是有效的JSON`);
+        }
+      } else if (data instanceof ArrayBuffer) {
+        dataLength = data.byteLength;
+        dataString = new TextDecoder().decode(data);
+        messageContent = dataString.substring(0, 200);
+        try {
+          parsedData = JSON.parse(dataString);
+          console.log(`[${new Date().toISOString()}] 成功解析ArrayBuffer为JSON: ${JSON.stringify(parsedData)}`);
+        } catch (parseError) {
+          console.log(`[${new Date().toISOString()}] ArrayBuffer不是有效的JSON`);
+        }
+      } else {
+        // 尝试其他转换方式
+        dataString = String(data);
+        dataLength = dataString.length;
+        messageContent = dataString.substring(0, 200);
+        try {
+          parsedData = JSON.parse(dataString);
+          console.log(`[${new Date().toISOString()}] 成功解析其他数据类型为JSON: ${JSON.stringify(parsedData)}`);
+        } catch (parseError) {
+          console.log(`[${new Date().toISOString()}] 其他数据类型不是有效的JSON`);
+        }
+      }
+    } catch (e) {
+      console.error('解析数据时出错:', e);
+      dataString = String(data);
+    }
+    
+    console.log(`[${new Date().toISOString()}] 收到目标服务器消息 (${dataLength} 字节): ${messageContent}...`);
+    
     // 将目标服务器的消息转发给客户端
     try {
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
+        console.log(`[${new Date().toISOString()}] 转发消息给客户端 - 客户端连接状态: OPEN`);
+        
+        // 记录转发前的详细信息
+        console.log(`[${new Date().toISOString()}] 转发前的数据类型: ${typeof data}`);
+        console.log(`[${new Date().toISOString()}] 转发前的数据字符串: ${dataString.substring(0, 100)}...`);
+        
+        // 尝试发送消息 - 确保发送字符串格式
+        const sendResult = ws.send(dataString);
+        console.log(`[${new Date().toISOString()}] 消息转发成功 - send方法返回: ${sendResult}`);
+        
+        // 如果成功解析了JSON，单独打印出来以便查看
+        if (parsedData) {
+          console.log(`[${new Date().toISOString()}] ✅ 转发的JSON数据:`, parsedData);
+        }
+      } else {
+        console.warn(`[${new Date().toISOString()}] 客户端连接未打开，无法转发消息。当前状态: ${ws.readyState}`);
       }
     } catch (error) {
       console.error('转发目标服务器消息失败:', error);
+      // 输出更多错误详情 - 添加类型检查
+      if (error instanceof Error) {
+        console.error('错误类型:', error.name);
+        console.error('错误消息:', error.message);
+        console.error('错误栈:', error.stack);
+      } else {
+        console.error('未知错误类型:', error);
+      }
     }
   });
   
   // 处理客户端消息
-  ws.on('message', (data) => {
-    // 将客户端的消息转发给目标服务器
+  ws.on('message', (data: any) => {
+    // 计算数据长度
+    let dataLength = 0;
+    let messageContent = '';
+    let dataString = '';
+    
     try {
-      if (targetWs.readyState === WebSocket.OPEN) {
-        targetWs.send(data);
+      // 确保数据被转换为字符串，模仿direct-ws-test.ts的行为
+      if (typeof data === 'string') {
+        dataLength = data.length;
+        messageContent = data.substring(0, 100);
+        dataString = data;
+      } else if (data instanceof Buffer) {
+        dataLength = data.length;
+        dataString = data.toString('utf8');
+        messageContent = dataString.substring(0, 100);
+      } else if (data instanceof ArrayBuffer) {
+        dataLength = data.byteLength;
+        dataString = new TextDecoder().decode(data);
+        messageContent = dataString.substring(0, 100);
+      } else {
+        // 尝试其他转换方式
+        dataString = String(data);
+        dataLength = dataString.length;
+        messageContent = dataString.substring(0, 100);
       }
-    } catch (error) {
-      console.error('转发客户端消息失败:', error);
+    } catch (e) {
+      console.error('处理客户端消息数据转换错误:', e);
+      dataString = String(data);
+    }
+    
+    console.log(`[${new Date().toISOString()}] 收到客户端消息 (${dataLength} 字节): ${messageContent}...`);
+    
+    // 确保目标连接已建立后再发送消息
+    if (targetWs.readyState !== WebSocket.OPEN) {
+      // 如果目标连接还在建立中，等待并发送
+      console.log(`[${new Date().toISOString()}] 目标连接未就绪，等待建立...`);
+      
+      // 等待连接建立的函数
+      const waitForConnection = () => {
+        if (targetWs.readyState === WebSocket.OPEN) {
+          console.log(`[${new Date().toISOString()}] 目标连接已建立，准备发送消息`);
+          // 确保发送字符串格式的数据
+          targetWs.send(dataString);
+          console.log(`[${new Date().toISOString()}] 消息发送成功 - 发送了字符串格式数据`);
+        } else if (targetWs.readyState === WebSocket.CONNECTING) {
+          // 继续等待
+          setTimeout(waitForConnection, 50);
+        } else {
+          console.error(`[${new Date().toISOString()}] 目标连接失败，无法发送消息。状态: ${targetWs.readyState}`);
+        }
+      };
+      
+      // 开始等待
+      setTimeout(waitForConnection, 50);
+    } else {
+      // 直接发送消息 - 确保发送字符串格式
+      targetWs.send(dataString);
+      console.log(`[${new Date().toISOString()}] 消息发送成功 - 发送了字符串格式数据`);
     }
   });
   

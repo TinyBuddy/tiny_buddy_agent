@@ -12,13 +12,14 @@ const ws = new WebSocket(proxyWsUrl);
 ws.on('open', () => {
   console.log('WebSocket连接已成功建立');
   
-  // 发送测试消息到服务器
+  // 发送认证数据到服务器
   try {
-    const testMessage = JSON.stringify({ test: 'Hello from proxy test client' });
+    const authData = {"authToken":"9b4f328f-c427-424c-a549-09674f41af28","deviceId":"94a99031b91c","version":"1.7.7"};
+    const testMessage = JSON.stringify(authData);
     ws.send(testMessage);
-    console.log('已发送测试消息到代理服务器');
+    console.log('已发送认证数据到代理服务器:', authData);
   } catch (error) {
-    console.error('发送测试消息失败:', error);
+    console.error('发送认证数据失败:', error);
   }
 });
 
