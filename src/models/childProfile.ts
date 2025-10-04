@@ -18,8 +18,8 @@ export const createDefaultChildProfile = (id: string): ChildProfile => ({
   age: 4,
   gender: "other",
   preferredLanguage: "zh",
-  interests: [],
-  dislikes: [],
+  interests: ["游戏", "运动"],
+  dislikes: ["危险物品"],
   learningProgress: {},
   lastInteraction: new Date(),
 });

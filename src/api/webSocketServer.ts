@@ -164,8 +164,20 @@ class WebSocketMessageHandler {
       await app.processUserInputWithStreaming(
         childProfileId,
         userInput,
-        (content: string, isFinal: boolean) => {
+        (content: string, isFinal: boolean, metadata?: Record<string, unknown>) => {
           if (ws.readyState === WebSocket.OPEN) {
+            // 如果有提示词元数据，创建专门的提示词消息
+            if (metadata?.prompt && !isFinal) {
+              ws.send(
+                JSON.stringify({
+                  type: "prompt",
+                  content: metadata.prompt,
+                  timestamp: new Date().toISOString(),
+                }),
+              );
+            }
+            
+            // 发送正常的进度或最终响应消息
             ws.send(
               JSON.stringify({
                 type: isFinal ? "final_response" : "progress",

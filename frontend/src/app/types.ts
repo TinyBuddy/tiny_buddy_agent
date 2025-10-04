@@ -2,6 +2,7 @@
 export interface Message {
   sender: string;
   content: string;
+  isPromptMessage?: boolean; // 可选属性，用于标识提示词消息，以便渲染时处理换行
 }
 
 // WebSocket消息数据接口

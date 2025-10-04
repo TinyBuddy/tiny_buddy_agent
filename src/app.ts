@@ -239,7 +239,7 @@ export class TinyBuddyApp {
   public async processUserInputWithStreaming(
     childId: string,
     userInput: string,
-    onProgress: (content: string, isFinal: boolean) => void,
+    onProgress: (content: string, isFinal: boolean, metadata?: Record<string, unknown>) => void,
     onError?: (error: Error) => void,
   ): Promise<string> {
     if (!this.isRunning) {
@@ -270,6 +270,9 @@ export class TinyBuddyApp {
 
       // 获取儿童档案和对话历史
       const childProfile = await this.memoryService.getChildProfile(childId);
+
+      console.log("app 获取儿童档案:", childProfile);
+
       const conversationHistory =
         await this.memoryService.getConversationHistory(childId);
 
@@ -307,33 +310,71 @@ export class TinyBuddyApp {
       }
 
       // 发送处理中消息
-      onProgress("正在思考...", false);
+      // onProgress("正在思考...", false);
 
-      // 规划Agent创建互动计划
-      console.log("调用规划Agent创建互动计划...");
-      const planResult = await planningAgent.process?.({
-        input: userMessage.content,
-        context,
-      });
+      // 首先尝试从内存中获取已有的规划结果
+      let planResult = await this.memoryService.getPlanningResult(childId);
 
-      if (!planResult || !planResult.output) {
-        throw new Error("规划Agent未返回有效的计划");
+      console.log("从内存中获取到的 planResult", planResult)
+      let planOutput = planResult?.plan;
+      
+      // 检查是否需要创建或更新规划
+      // 1. 如果没有规划结果，或者
+      // 2. 上一次规划时间超过30秒
+      const shouldTriggerPlanning = !planResult || 
+        (planResult.timestamp && (Date.now() - planResult.timestamp.getTime() > 30000));
+      
+      if (shouldTriggerPlanning) {
+        // 如果没有已有规划或规划已过期，启动异步规划任务
+        console.log("启动异步规划任务...", shouldTriggerPlanning ? "因为规划不存在或已过期" : "");
+        
+        // 创建异步规划任务，但不阻塞当前流程
+        (async () => {
+          try {
+            const newPlanResult = await planningAgent.process?.({
+              input: userMessage.content,
+              context,
+            });
+
+            console.log("规划任务的newPlanResult", newPlanResult)
+            
+            if (newPlanResult && newPlanResult.output) {
+              console.log("规划任务完成，保存结果到内存");
+              await this.memoryService.setPlanningResult(childId, newPlanResult.output);
+            }
+          } catch (error) {
+            console.error("异步规划任务失败:", error);
+          }
+        })();
+        
+        // 如果没有规划结果，使用默认规划确保对话能够继续
+        if (!planOutput) {
+          planOutput = {
+            type: "plan",
+            interactionType: "chat",
+            strategy: "Chat with the child as a friend using simple and easy-to-understand language"
+          };
+        }
+      } else {
+        console.log("使用内存中的规划结果");
       }
-
-      console.log("规划结果:", planResult.output);
 
       // 根据计划类型发送进度更新
       let planType = "普通对话";
-      // 解析计划输出以获取类型信息
-      let planOutput: unknown = planResult.output;
+      // 确保planOutput是对象格式
       try {
-        // 如果输出是字符串，尝试解析为JSON
-        if (typeof planResult.output === "string") {
-          planOutput = JSON.parse(planResult.output);
+        // 如果planOutput是字符串，尝试解析为JSON
+        if (typeof planOutput === "string") {
+          planOutput = JSON.parse(planOutput);
         }
       } catch (parseError) {
-        // 如果解析失败，保持原样
-        console.warn("解析计划输出失败:", parseError);
+        // 如果解析失败，使用默认规划
+        console.warn("解析计划输出失败，使用默认规划:", parseError);
+        planOutput = {
+          type: "plan",
+          interactionType: "chat",
+          strategy: "Chat with the child as a friend using simple and easy-to-understand language"
+        };
       }
 
       if (
@@ -361,14 +402,25 @@ export class TinyBuddyApp {
 
       // 执行Agent根据计划生成响应
       console.log("调用执行Agent生成响应...");
+      console.log("传给excution agent的plan:", planOutput);
       const executionResult = await executionAgent.process?.({
         input: userMessage.content,
         context,
-        plan: planResult.output,
+        plan: planOutput,
       });
 
       if (!executionResult || !executionResult.output) {
         throw new Error("执行Agent未返回有效的响应");
+      }
+
+      console.log("执行Agent生成的提示词:", executionResult.metadata?.prompt || "无提示词");
+
+      // 发送带有提示词的进度更新
+      if (executionResult.metadata?.prompt) {
+        console.log("发送提示词到前端");
+        onProgress("已生成提示词", false, {
+          prompt: executionResult.metadata.prompt
+        });
       }
 
       // 创建最终响应消息
@@ -380,7 +432,7 @@ export class TinyBuddyApp {
         metadata: {
           interactionType: executionResult.metadata?.interactionType || "chat",
           isFinalResponse: true,
-          plan: planResult.output,
+          plan: planOutput,
         },
       });
 

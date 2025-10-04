@@ -76,10 +76,13 @@ export class ExecutionAgent implements BaseActor {
     plan?: ExecutionPlan;
     relevantKnowledge?: any;
   }): Promise<{ output: string; metadata?: Record<string, unknown> }> {
+
+	console.log("executionAgent process input :", input);
+
     // 使用传入的计划
     if (input.plan) {
       this.currentPlan = input.plan;
-      this.state.currentInteractionType =
+      this.state.currentInteractionType = 
         input.plan.interactionType || input.plan.type;
       this.state.currentContentId = input.plan.contentId;
 
@@ -152,6 +155,7 @@ export class ExecutionAgent implements BaseActor {
             interactionType,
             learningPoint,
             progress,
+            prompt, // 添加提示词到metadata
           },
         };
       } catch (error) {
@@ -162,7 +166,7 @@ export class ExecutionAgent implements BaseActor {
           `Hey ${input.context.childProfile.name}! I'm Sparky the dinosaur! Let's be friends and learn Chinese together!`,
           `Roar! Hi ${input.context.childProfile.name}! I'm Sparky! I can't wait to play and learn with you!`,
         ];
-        const defaultResponse =
+        const defaultResponse = 
           greetings[Math.floor(Math.random() * greetings.length)];
 
         // 确定交互类型
@@ -344,11 +348,20 @@ export class ExecutionAgent implements BaseActor {
 
     // 添加相关知识库内容（如果有）
     if (relevantKnowledge?.content) {
+	  console.log("promt add relevantKnowledge:", relevantKnowledge);
       systemPrompt += `\n\nHere's some relevant teaching material to reference in your response: ${JSON.stringify(relevantKnowledge.content)}\n`;
     }
 
+	if (plan?.strategy) {
+	  systemPrompt += `\n\nTeaching strategy for this interaction: ${plan.strategy}\n`;
+	}
+
+	systemPrompt += `\n\nrelevantKnowledge: 暂无\n`;
+
+
     // 添加计划信息（如果有）
     if (plan?.teachingFocus) {
+	  console.log("promt add plan:", plan);
       systemPrompt += `\n\nTeaching focus for this interaction: ${plan.teachingFocus}\n`;
     }
 

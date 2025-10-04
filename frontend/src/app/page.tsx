@@ -108,6 +108,16 @@ export default function ChatInterface() {
                 ...prev,
                 { sender: "系统", content: data.message },
               ]);
+            } else if (data.type === "prompt") {
+              // 显示系统提示词，使用特殊的发送者标识
+              setMessages((prev) => [
+                ...prev,
+                { 
+                  sender: "系统提示词", 
+                  content: data.content,
+                  isPromptMessage: true // 添加标识以便渲染时处理换行
+                },
+              ]);
             } else {
               // 根据消息类型和字段选择合适的内容
               const content = data.content || data.message || "未知消息";
@@ -572,7 +582,7 @@ export default function ChatInterface() {
                     className={`mb-4 ${msg.sender.startsWith("用户") ? "ml-auto" : "mr-auto"} max-w-[80%]`}
                   >
                     <div
-                      className={`p-3 rounded-lg ${msg.sender.startsWith("用户") ? "bg-blue-500 text-white" : "bg-green-100 dark:bg-green-900 text-gray-900 dark:text-gray-100"}`}
+                      className={`p-3 rounded-lg ${msg.sender.startsWith("用户") ? "bg-blue-500 text-white" : msg.isPromptMessage ? "bg-purple-100 dark:bg-purple-900 text-gray-900 dark:text-gray-100 border border-purple-300 dark:border-purple-700" : "bg-green-100 dark:bg-green-900 text-gray-900 dark:text-gray-100"}`}
                     >
                       <div className="font-semibold mb-1 flex justify-between items-center">
                         {msg.sender}
@@ -587,7 +597,19 @@ export default function ChatInterface() {
                           </button>
                         )}
                       </div>
-                      <div>{msg.content}</div>
+                      <div>
+                        {/* 处理系统提示词的换行 */}
+                        {msg.isPromptMessage ? (
+                          msg.content.split('\n').map((line, i) => (
+                            <React.Fragment key={i}>
+                              {line}
+                              {i < msg.content.split('\n').length - 1 && <br />}
+                            </React.Fragment>
+                          ))
+                        ) : (
+                          msg.content
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))

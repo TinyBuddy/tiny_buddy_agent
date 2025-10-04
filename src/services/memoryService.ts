@@ -29,14 +29,19 @@ export interface MemoryService {
     knowledgePoint: string,
     progress: number,
   ): Promise<void>;
+
+  // 规划管理
+  getPlanningResult(childId: string): Promise<{plan: any, timestamp: Date} | null>;
+  setPlanningResult(childId: string, plan: any): Promise<void>;
+  updatePlanningResult(childId: string, plan: any): Promise<void>;
 }
 
 // 内存实现的记忆服务
 // 注意：在实际应用中，应该使用持久化存储
-
 export class InMemoryMemoryService implements MemoryService {
   private childProfiles: Map<string, ChildProfile> = new Map();
   private conversationHistories: Map<string, ConversationHistory> = new Map();
+  private planningResults: Map<string, { plan: any; timestamp: Date }> = new Map();
   private initialized = false;
 
   async init(): Promise<void> {
@@ -246,6 +251,38 @@ export class InMemoryMemoryService implements MemoryService {
 
     await this.updateChildProfile(childId, {
       learningProgress: updatedProgress,
+    });
+  }
+
+  // 获取规划结果
+  async getPlanningResult(childId: string): Promise<{plan: any, timestamp: Date} | null> {
+    await this.ensureInitialized();
+    
+    const result = this.planningResults.get(childId);
+    return result || null;
+  }
+
+  // 设置规划结果
+  async setPlanningResult(childId: string, plan: any): Promise<void> {
+    await this.ensureInitialized();
+    
+    this.planningResults.set(childId, {
+      plan,
+      timestamp: new Date()
+    });
+  }
+
+  // 更新规划结果
+  async updatePlanningResult(childId: string, plan: any): Promise<void> {
+    await this.ensureInitialized();
+    
+    // 这里可以添加合并逻辑，根据需要更新现有计划
+    this.planningResults.set(childId, {
+      plan: {
+        ...(this.planningResults.get(childId)?.plan || {}),
+        ...plan
+      },
+      timestamp: new Date()
     });
   }
 

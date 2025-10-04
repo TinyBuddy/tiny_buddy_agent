@@ -606,12 +606,16 @@ export class PlanningAgent implements BaseActor {
     const recentMessages = this.getRecentMessages(conversationHistory, 5);
     const knowledgeSummary = this.summarizeKnowledgeBase(knowledgeBase);
 
+	console.log("规划agent 调用最近5条消息:", recentMessages);
+
     // 构建规划提示词
     const prompt = this.buildPlanningPrompt(
       childProfile,
       recentMessages,
       knowledgeSummary,
     );
+
+	console.log("规划agent promt:", prompt);
 
     // 调用大模型生成规划
     const result = await generateText({
