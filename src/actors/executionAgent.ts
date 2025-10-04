@@ -1,5 +1,5 @@
-import { deepseek } from "@ai-sdk/deepseek";
-// import { openai } from "@ai-sdk/openai";
+// import { deepseek } from "@ai-sdk/deepseek";
+import { openai } from "@ai-sdk/openai";
 
 import { generateText } from "ai";
 import { config } from "dotenv";
@@ -128,8 +128,8 @@ export class ExecutionAgent implements BaseActor {
 
         // 调用大模型生成初始响应
         const result = await generateText({
-          model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
-        //   model: openai("gpt-4.1"),
+        //   model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
+          model: openai("gpt-4.1"),
           prompt,
           maxOutputTokens: 300, // 增加token数以支持更长的响应
           temperature: 0.7,
@@ -255,8 +255,8 @@ export class ExecutionAgent implements BaseActor {
 
       // 调用大模型生成响应
       const result = await generateText({
-        model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
-        // model: openai("gpt-4.1"),
+        // model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
+        model: openai("gpt-4.1"),
         prompt,
         maxOutputTokens: 200,
         temperature: 0.7,

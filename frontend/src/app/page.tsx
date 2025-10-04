@@ -10,7 +10,7 @@ import {
 export default function ChatInterface() {
   // 状态管理
   const [childID, setChildID] = useState<string>("");
-  const [prompt, setPrompt] = useState<string>("");
+  const [prompt, setPrompt] = useState<string>("你是一个AI助手，帮助用户解答问题。"); // 设置默认提示词，确保可以自动连接
   const [chatMessage, setChatMessage] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [socket, setSocket] = useState<WebSocket | null>(null);
@@ -535,23 +535,26 @@ export default function ChatInterface() {
                 >
                   Prompt
                 </label>
+                {/* 隐藏的Prompt输入框 */}
                 <textarea
                   id="prompt"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  className="hidden w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                   placeholder="请输入Prompt"
                   rows={6}
                 />
               </div>
               <div className="space-y-4 mt-auto">
+                {/* 隐藏的更新提示词按钮 */}
                 <button
                   onClick={updatePrompt}
                   disabled={!isConnected || !prompt.trim()}
-                  className={`w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors ${!isConnected || !prompt.trim() ? "opacity-50 cursor-not-allowed" : ""}`}
+                  className={`hidden w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors ${!isConnected || !prompt.trim() ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   更新系统提示词
                 </button>
+                {/* 连接状态显示 */}
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   {connectionStatus === "connected" ? (
                     <span className="text-green-600 dark:text-green-400">
@@ -562,7 +565,7 @@ export default function ChatInterface() {
                       正在连接...
                     </span>
                   ) : (
-                    <span>请输入Child ID和Prompt以建立连接</span>
+                    <span>请输入Child ID以建立连接</span>
                   )}
                 </div>
               </div>

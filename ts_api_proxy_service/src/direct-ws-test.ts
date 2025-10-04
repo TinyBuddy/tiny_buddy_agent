@@ -14,12 +14,14 @@ try {
 
   ws.on("open", () => {
     console.log("✅ 直接连接成功建立！");
-    // 发送一个简单的测试消息
+    // 发送验证数据
     try {
-      ws.send(JSON.stringify({ test: "Hello from direct test" }));
-      console.log("测试消息已发送");
+      const authData = { authToken: "9b4f328f-c427-424c-a549-09674f41af28", deviceId: "94a99031b91c", version: "1.7.7" };
+      ws.send(JSON.stringify(authData));
+      console.log("验证数据已发送");
+      console.log("发送的验证数据:", JSON.stringify(authData, null, 2));
     } catch (error) {
-      console.error("发送测试消息失败:", error);
+      console.error("发送验证数据失败:", error);
     }
   });
 
