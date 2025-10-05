@@ -1,10 +1,13 @@
-import { serve } from "@hono/node-server";
 import { config } from "dotenv";
 // API服务器实现
 import { Hono } from "hono";
+import { serve } from '@hono/node-server';
 import { z } from "zod";
 import app from "../app";
 import type { InMemoryMemoryService } from "../services/memoryService";
+import { db } from '../db/db';
+import { vocabulary } from '../db/schema';
+import { eq, and, gte, lte } from 'drizzle-orm';
 
 // 加载环境变量
 config();
@@ -256,6 +259,76 @@ apiApp.get("/api/interests/:childId?", async (c) => {
   }
 });
 
+// 8. 获取词汇表端点（支持时间区间筛选）
+apiApp.get("/api/vocabulary", async (c) => {
+  try {
+    // 获取查询参数
+    const childId = c.req.query("childId");
+    const startDate = c.req.query("startDate");
+    const endDate = c.req.query("endDate");
+
+    // 验证必要的参数
+    if (!childId) {
+      return c.json(
+        {
+          success: false,
+          error: "参数验证失败",
+          details: [{ message: "childId是必需的参数" }],
+        },
+        400,
+      );
+    }
+
+    console.log(`获取儿童 ${childId} 的词汇表，时间区间: ${startDate || '开始'} 到 ${endDate || '现在'}`);
+
+    // 构建查询条件
+    const conditions = [eq(vocabulary.childId, childId)];
+    
+    // 添加时间区间条件
+    if (startDate) {
+      conditions.push(gte(vocabulary.createdAt, new Date(startDate)));
+    }
+    
+    if (endDate) {
+      conditions.push(lte(vocabulary.createdAt, new Date(endDate)));
+    }
+
+    // 查询数据库获取词汇表
+    const result = await db
+      .select({ word: vocabulary.word })
+      .from(vocabulary)
+      .where(and(...conditions));
+
+    // 提取词汇并去重
+    const words = Array.from(new Set(result.map(item => item.word)));
+
+    // 返回成功响应
+    return c.json({
+      success: true,
+      data: {
+        words,
+        count: words.length,
+        childId,
+        timeRange: {
+          start: startDate || null,
+          end: endDate || null
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('获取词汇表时出错:', error);
+    return c.json(
+      {
+        success: false,
+        error: "服务器内部错误",
+      },
+      500,
+    );
+  }
+});
+
 // 启动服务器函数
 export const startServer = async () => {
   // 定义服务器端口，默认使用3142
@@ -276,6 +349,7 @@ export const startServer = async () => {
   console.log("GET    /api/profile/:childId?   - 获取儿童档案");
   console.log("POST   /api/profile/:childId?   - 更新儿童档案");
   console.log("GET    /api/interests/:childId? - 分析儿童兴趣");
+  console.log("GET    /api/vocabulary          - 获取儿童词汇表(支持时间区间筛选)");
 
   // 处理进程终止信号
   const handleShutdown = async () => {

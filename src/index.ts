@@ -33,6 +33,7 @@ async function startApplication() {
     // 启动HTTP API服务器
     let apiServer = null;
     let webSocketServerInstance = null;
+    let httpServer = null;
 
     try {
       console.log("尝试导入并启动HTTP API服务器...");
@@ -44,6 +45,16 @@ async function startApplication() {
       console.log("开始启动HTTP API服务器...");
       apiServer = await startServer();
       console.log("HTTP API服务器启动成功");
+
+      // 导入并启动新的HTTP服务器（基于Next.js）
+      console.log("尝试导入并启动新的HTTP服务器...");
+      const { startHttpServer } = await import("./nextApp");
+      console.log("成功导入新的HTTP服务器模块");
+
+      // 启动新的HTTP服务器（使用不同的端口）
+      console.log("开始启动新的HTTP服务器...");
+      httpServer = await startHttpServer();
+      console.log("新的HTTP服务器启动成功");
 
       console.log("尝试导入并启动WebSocket服务器...");
       // 延迟导入以避免循环依赖
@@ -67,6 +78,7 @@ async function startApplication() {
     console.log("- SDK已准备就绪，可以通过导入使用");
     console.log("- Console UI: 请在另一个终端执行 'npm run volt' 启动");
     console.log("- HTTP API: http://localhost:3142/api");
+    console.log("- Next.js HTTP服务器: http://localhost:3144/api");
     console.log("- WebSocket: ws://localhost:3143");
     console.log("=================================");
 
@@ -84,6 +96,11 @@ async function startApplication() {
         // 关闭HTTP API服务器
         if (apiServer) {
           await new Promise((resolve) => apiServer.close(resolve));
+        }
+
+        // 关闭新的HTTP服务器
+        if (httpServer) {
+          await new Promise((resolve) => httpServer.close(resolve));
         }
 
         // 关闭主应用
