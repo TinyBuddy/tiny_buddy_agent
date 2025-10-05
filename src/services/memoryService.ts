@@ -16,6 +16,7 @@ export interface MemoryService {
     profile: Partial<ChildProfile>,
   ): Promise<ChildProfile>;
   createChildProfile(profile: Omit<ChildProfile, "id">): Promise<ChildProfile>;
+  getAllChildIds(): Promise<string[]>;
 
   // 对话历史管理
   getConversationHistory(childId: string): Promise<Message[]>;
@@ -291,5 +292,11 @@ export class InMemoryMemoryService implements MemoryService {
     if (!this.initialized) {
       await this.init();
     }
+  }
+
+  // 获取所有儿童ID
+  async getAllChildIds(): Promise<string[]> {
+    await this.ensureInitialized();
+    return Array.from(this.childProfiles.keys());
   }
 }

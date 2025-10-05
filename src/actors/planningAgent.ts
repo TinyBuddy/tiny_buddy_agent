@@ -1,5 +1,5 @@
-// import { deepseek } from "@ai-sdk/deepseek";
-import { openai } from "@ai-sdk/openai";
+import { deepseek } from "@ai-sdk/deepseek";
+// import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { config } from "dotenv";
 import type { ChildProfile } from "../models/childProfile";
@@ -364,8 +364,8 @@ export class PlanningAgent implements BaseActor {
 
       // 调用大模型生成计划
       const result = await generateText({
-        // model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
-        model: openai("gpt-4.1"),
+        model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
+        // model: openai("gpt-4.1"),
         prompt,
         maxOutputTokens: 800,
         temperature: 0.7,
@@ -619,8 +619,8 @@ export class PlanningAgent implements BaseActor {
 
     // 调用大模型生成规划
     const result = await generateText({
-    //   model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
-      model: openai("gpt-4.1"),
+      model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
+    //   model: openai("gpt-4.1"),
       prompt,
       maxOutputTokens: 500,
       temperature: 0.6,

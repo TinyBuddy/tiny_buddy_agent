@@ -4,6 +4,7 @@ import { config } from "dotenv";
 import { ActorManager } from "./factories/actorManager";
 import { ExecutionAgentFactory } from "./factories/executionAgentFactory";
 import { PlanningAgentFactory } from "./factories/planningAgentFactory";
+import { LongtermPlanningAgentFactory } from "./factories/longtermPlanningAgentFactory";
 import {
   type ChildProfile,
   createDefaultChildProfile,
@@ -59,9 +60,10 @@ export class TinyBuddyApp {
     await this.knowledgeBaseService.init();
     await this.memoryService.init();
 
-    // 注册Actor工厂 - 只使用规划Agent和执行Agent（符合架构图要求）
+    // 注册Actor工厂
     this.actorManager.registerFactory(new PlanningAgentFactory());
     this.actorManager.registerFactory(new ExecutionAgentFactory());
+    this.actorManager.registerFactory(new LongtermPlanningAgentFactory());
 
     // 创建默认儿童档案（如果不存在）
     const defaultChildId = "default_child";
@@ -74,6 +76,17 @@ export class TinyBuddyApp {
         defaultChildId,
         defaultProfile,
       );
+    }
+
+    // 创建长期规划Agent实例
+    try {
+      await this.actorManager.createActor("longtermPlanningAgent", {
+        knowledgeBaseService: this.knowledgeBaseService,
+        memoryService: this.memoryService,
+      });
+      console.log("长期规划Agent创建成功，已开始每分钟执行一次任务");
+    } catch (error) {
+      console.error("创建长期规划Agent失败:", error);
     }
 
     this.isRunning = true;
