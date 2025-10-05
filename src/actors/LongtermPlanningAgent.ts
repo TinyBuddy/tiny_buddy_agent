@@ -9,6 +9,9 @@ import type { Message } from "../models/message";
 import type { KnowledgeBaseService } from "../services/knowledgeBaseService";
 import type { MemoryService } from "../services/memoryService";
 import type { ActorContext, BaseActor } from "./baseActor";
+import type { VocabularyService } from '../services/vocabularyService';
+import { defaultVocabularyService } from '../services/vocabularyService';
+import { testDbConnection } from '../db/db';
 
 // 加载环境变量
 config();
@@ -33,7 +36,7 @@ interface PlanningResult {
   strategy: string;
 }
 
-// 中文词汇存储接口
+// 中文词汇存储接口（已迁移到数据库，保留接口用于兼容性）
 interface ChineseVocabularyStore {
   // 存储中文词汇，按childId组织
   vocabularyMap: Map<string, Set<string>>;
@@ -49,14 +52,18 @@ export class LongtermPlanningAgent implements BaseActor {
   private knowledgeBaseService: KnowledgeBaseService | undefined;
   private memoryService: MemoryService | undefined;
   private scheduleTimer: NodeJS.Timeout | null = null;
+  private vocabularyService: VocabularyService;
+  // 保留内存中的词汇存储作为缓存
   private vocabularyStore: ChineseVocabularyStore = {
     vocabularyMap: new Map(),
   };
   private checkIntervalMinutes: number = 1; // 每分钟执行一次
+  private dbInitialized: boolean = false;
 
   constructor(config: {
     knowledgeBaseService?: KnowledgeBaseService;
     memoryService?: MemoryService;
+    vocabularyService?: VocabularyService;
   }) {
     this.id = "longterm_planning_agent";
     this.name = "长期规划Agent";
@@ -64,6 +71,7 @@ export class LongtermPlanningAgent implements BaseActor {
     this.type = "longtermPlanningAgent";
     this.knowledgeBaseService = config.knowledgeBaseService;
     this.memoryService = config.memoryService;
+    this.vocabularyService = config.vocabularyService || defaultVocabularyService;
   }
 
   async init(context?: ActorContext): Promise<void> {
@@ -73,8 +81,45 @@ export class LongtermPlanningAgent implements BaseActor {
       lastUpdated: new Date(),
     };
 
+    // 初始化数据库连接
+    try {
+      this.dbInitialized = await testDbConnection();
+      if (this.dbInitialized) {
+        console.log("数据库连接成功，将使用数据库存储词汇表");
+        // 预加载所有用户的词汇表到内存缓存
+        await this.preloadVocabularyCache();
+      } else {
+        console.warn("数据库连接失败，将使用内存存储词汇表");
+      }
+    } catch (error) {
+      console.error("数据库初始化失败:", error);
+      this.dbInitialized = false;
+    }
+
     // 启动周期调度器（每分钟执行一次）
     this.startPeriodicScheduler();
+  }
+
+  // 预加载所有用户的词汇表到内存缓存
+  private async preloadVocabularyCache(): Promise<void> {
+    try {
+      if (!this.memoryService) {
+        return;
+      }
+
+      // 获取所有用户ID
+      const allChildIds = await this.memoryService.getAllChildIds();
+      
+      // 为每个用户预加载词汇表
+      for (const childId of allChildIds) {
+        const words = await this.vocabularyService.getVocabularyByChildId(childId);
+        const wordSet = new Set(words);
+        this.vocabularyStore.vocabularyMap.set(childId, wordSet);
+        console.log(`预加载用户 ${childId} 的词汇表，共 ${words.length} 个词汇`);
+      }
+    } catch (error) {
+      console.error("预加载词汇表缓存失败:", error);
+    }
   }
 
   // 启动每分钟的调度器
@@ -308,26 +353,50 @@ export class LongtermPlanningAgent implements BaseActor {
   // 提取并存储中文词汇
   private async extractAndStoreChineseVocabulary(childId: string, messages: Message[]): Promise<void> {
     try {
-      // 初始化用户的词汇集合
-      if (!this.vocabularyStore.vocabularyMap.has(childId)) {
-        this.vocabularyStore.vocabularyMap.set(childId, new Set());
-      }
-      
-      const vocabularySet = this.vocabularyStore.vocabularyMap.get(childId)!;
-      
       // 合并所有消息内容
       const allContent = messages.map(m => m.content).join(" ");
       
       // 正则表达式匹配中文字符
       const chineseChars = allContent.match(/[\u4e00-\u9fa5]+/g) || [];
       
-      // 存储中文字符
-      chineseChars.forEach(char => {
-        // 可以根据需要进一步处理，比如分词等
+      if (chineseChars.length === 0) {
+        console.log(`用户 ${childId} 的消息中没有找到中文字符`);
+        return;
+      }
+      
+      // 初始化用户的词汇集合（内存缓存）
+      if (!this.vocabularyStore.vocabularyMap.has(childId)) {
+        this.vocabularyStore.vocabularyMap.set(childId, new Set());
+      }
+      
+      const vocabularySet = this.vocabularyStore.vocabularyMap.get(childId)!;
+      
+      // 过滤掉已存在于内存缓存中的词汇
+      const newChars = chineseChars.filter(char => !vocabularySet.has(char));
+      
+      if (newChars.length === 0) {
+        console.log(`用户 ${childId} 没有发现新的中文字符`);
+        return;
+      }
+      
+      // 更新内存缓存
+      newChars.forEach(char => {
         vocabularySet.add(char);
       });
       
-      // 在实际应用中，这里应该将词汇持久化存储
+      // 将词汇持久化存储到数据库
+      if (this.dbInitialized) {
+        try {
+          await this.vocabularyService.addVocabulary(childId, newChars);
+          console.log(`为用户 ${childId} 提取并保存了 ${newChars.length} 个新的中文字符到数据库`);
+        } catch (dbError) {
+          console.error(`将词汇保存到数据库失败:`, dbError);
+          // 即使数据库保存失败，我们仍然保留内存中的更新
+        }
+      } else {
+        console.log(`数据库未初始化，仅在内存中保存了 ${newChars.length} 个中文字符`);
+      }
+      
       console.log(`为用户 ${childId} 提取了 ${chineseChars.length} 个中文字符`);
       console.log(`用户 ${childId} 的词汇集合:`, Array.from(vocabularySet));
       

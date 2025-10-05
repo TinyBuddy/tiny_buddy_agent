@@ -14,6 +14,7 @@
 	"dependencies": {
 		"@ai-sdk/deepseek": "^1.0.20",
 		"@ai-sdk/openai": "^2.0.42",
+		"@types/pg": "^8.15.5",
 		"@voltagent/cli": "^0.1.10",
 		"@voltagent/core": "^1.0.0",
 		"@voltagent/libsql": "^1.0.0",
@@ -22,12 +23,15 @@
 		"ai": "^5.0.49",
 		"axios": "^1.12.2",
 		"dotenv": "^16.4.7",
+		"drizzle-orm": "^0.44.6",
+		"pg": "^8.16.3",
 		"ws": "^8.18.3",
 		"zod": "^3.25.76"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
 		"@types/node": "^22.10.5",
+		"ts-node": "^10.9.2",
 		"tsdown": "^0.15.2",
 		"tsx": "^4.19.2",
 		"typescript": "^5.7.3"
