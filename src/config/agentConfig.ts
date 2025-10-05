@@ -31,18 +31,18 @@ export let currentSystemPromptTemplate = defaultSystemPromptTemplate;
 
 // 更新系统提示词
 export const updateSystemPromptTemplate = (newPrompt: string): void => {
-  currentSystemPromptTemplate = newPrompt;
+	currentSystemPromptTemplate = newPrompt;
 };
 
 // 重置为默认系统提示词
 export const resetSystemPromptTemplate = (): void => {
-  currentSystemPromptTemplate = defaultSystemPromptTemplate;
+	currentSystemPromptTemplate = defaultSystemPromptTemplate;
 };
 
 // 获取完整的系统提示词（包含儿童信息）
 export const getFullSystemPrompt = (childProfile: any): string => {
-  return currentSystemPromptTemplate
-    .replace("{{childName}}", childProfile.name)
-    .replace("{{childAge}}", childProfile.age.toString())
-    .replace("{{childInterests}}", childProfile.interests.join(", "));
+	return currentSystemPromptTemplate
+		.replace("{{childName}}", childProfile.name)
+		.replace("{{childAge}}", childProfile.age.toString())
+		.replace("{{childInterests}}", childProfile.interests.join(", "));
 };
