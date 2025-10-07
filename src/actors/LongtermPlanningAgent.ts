@@ -56,7 +56,7 @@ export class LongtermPlanningAgent implements BaseActor {
 	private vocabularyStore: ChineseVocabularyStore = {
 		vocabularyMap: new Map(),
 	};
-	private checkIntervalMinutes = 1; // 每分钟执行一次
+	private checkIntervalMinutes = 60; // 每分钟执行一次
 	private dbInitialized = false;
 
 	constructor(config: {
