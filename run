@@ -10,6 +10,10 @@ nohup npm start </dev/null > dev.log 2>&1 &
 exit
 
 
+nohup python3 proxy.py </dev/null > dev.log 2>&1 &
+exit
+
+
 
 https://stg.tinybuddy.dev/api/devices/94a99031b91c/check-upgrade
 
