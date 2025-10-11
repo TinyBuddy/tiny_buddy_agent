@@ -428,13 +428,17 @@ export class TinyBuddyApp {
 			onProgress(`正在准备${planType}...`, false);
 
 			// 执行Agent根据计划生成响应
-			console.log("调用执行Agent生成响应...");
-			console.log("传给excution agent的plan:", planOutput);
-			const executionResult = await executionAgent.process?.({
-				input: userMessage.content,
-				context,
-				plan: planOutput,
-			});
+		console.log("调用执行Agent生成响应...");
+		console.log("传给excution agent的plan:", planOutput);
+		const executionResult = await executionAgent.process?.({
+			input: userMessage.content,
+			context,
+			plan: planOutput,
+			onStreamChunk: (chunk: string) => {
+				// 直接传递执行Agent生成的字符级流式输出
+				onProgress(chunk, false, { type: 'stream_chunk' });
+			},
+		});
 
 			if (!executionResult || !executionResult.output) {
 				throw new Error("执行Agent未返回有效的响应");

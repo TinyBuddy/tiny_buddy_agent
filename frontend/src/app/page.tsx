@@ -14,12 +14,14 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [connectionStatus, setConnectionStatus] =
+  const [connectionStatus, setConnectionStatus] = 
     useState<string>("disconnected"); // disconnected, connecting, connected
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // 用于跟踪当前正在播放的语音合成实例
-  const [currentSpeechInstance, setCurrentSpeechInstance] =
+  const [currentSpeechInstance, setCurrentSpeechInstance] = 
     useState<SpeechSynthesisUtterance | null>(null);
+  // 用于跟踪当前正在进行的流式消息ID
+  const [currentStreamingMessageId, setCurrentStreamingMessageId] = useState<string | null>(null);
 
   // 初始化WebSocket连接
   useEffect(() => {
@@ -124,6 +126,18 @@ export default function ChatInterface() {
                 ...prev,
                 { sender: "系统", content: data.message },
               ]);
+              return;
+            }
+
+            // 处理流式消息块
+            if (data.type === "stream_chunk") {
+              handleStreamingChunk(data);
+              return;
+            }
+
+            // 处理流式消息结束
+            if (data.type === "stream_end") {
+              handleStreamEnd(data);
               return;
             }
 
@@ -370,6 +384,52 @@ export default function ChatInterface() {
     };  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [childID, childAge, childInterests, languageLevel, gender]); // 注意：不包含messages.length作为依赖，因为它会导致消息变化时重新创建连接
 
+  // 处理流式消息块
+  const handleStreamingChunk = (data: any) => {
+    const { chunk, streamId } = data;
+    
+    // 如果这是一个新的流式消息
+    if (streamId !== currentStreamingMessageId) {
+      setCurrentStreamingMessageId(streamId);
+      // 添加新的流式消息
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: "AI",
+          content: chunk,
+          isStreaming: true,
+          streamingId: streamId
+        }
+      ]);
+    } else {
+      // 更新现有的流式消息
+      setMessages((prev) => 
+        prev.map((msg) => 
+          msg.streamingId === streamId 
+            ? { ...msg, content: msg.content + chunk }
+            : msg
+        )
+      );
+    }
+  };
+
+  // 处理流式消息结束
+  const handleStreamEnd = (data: any) => {
+    const { streamId } = data;
+    
+    // 将流式消息标记为非流式
+    setMessages((prev) => 
+      prev.map((msg) => 
+        msg.streamingId === streamId 
+          ? { ...msg, isStreaming: false }
+          : msg
+      )
+    );
+    
+    // 清除当前流式消息ID
+    setCurrentStreamingMessageId(null);
+  };
+
   // 发送消息
   const sendMessage = () => {
     if (socket && isConnected && chatMessage.trim()) {
@@ -506,6 +566,19 @@ export default function ChatInterface() {
       alert("语音播放失败，请稍后重试");
     }
   };
+
+  // 添加CSS样式
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = `
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .animate-blink {
+      animation: blink 1.4s infinite;
+    }
+  `;
+  document.head.appendChild(styleSheet);
 
   return (
     <div className="font-sans min-h-screen p-4 md:p-8 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
@@ -649,6 +722,13 @@ export default function ChatInterface() {
                       </div>
                       <div>
                         {msg.content}
+                        {msg.isStreaming && (
+                          <span className="inline-block ml-1">
+                            <span className="animate-blink">•</span>
+                            <span className="animate-blink" style={{ animationDelay: "0.2s" }}>•</span>
+                            <span className="animate-blink" style={{ animationDelay: "0.4s" }}>•</span>
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

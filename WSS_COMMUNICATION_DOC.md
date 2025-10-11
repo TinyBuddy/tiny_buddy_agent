@@ -126,18 +126,31 @@ ws.send(JSON.stringify({ type: "check_connection" }));
 
 #### 3.2.3 进度消息 (`progress`)
 
-流式响应过程中的中间结果：
+流式响应过程中的状态更新：
 
 ```json
 {
   "type": "progress",
-  "content": "部分响应内容...",
+  "content": "状态信息...",
   "isFinal": false,
   "timestamp": "2024-05-20T12:34:56.789Z"
 }
 ```
 
-#### 3.2.4 最终响应消息 (`final_response`)
+#### 3.2.4 字符级流式消息 (`stream_chunk`)
+
+字符级流式输出的内容块，用于实现AI回复逐字显示的效果：
+
+```json
+{
+  "type": "stream_chunk",
+  "content": "AI回复的单个字符或字符片段",
+  "isFinal": false,
+  "timestamp": "2024-05-20T12:34:56.789Z"
+}
+```
+
+#### 3.2.5 最终响应消息 (`final_response`)
 
 用户请求处理完成后的最终结果：
 
@@ -198,7 +211,6 @@ ws.send(JSON.stringify({ type: "check_connection" }));
 ## 6. 典型交互流程
 
 ### 6.1 完整对话流程
-
 1. 前端建立 WebSocket 连接
 2. 服务器返回 `connected` 消息
 3. 前端发送 `initialize` 初始化消息
@@ -206,7 +218,8 @@ ws.send(JSON.stringify({ type: "check_connection" }));
 5. 前端发送 `user_input` 用户输入消息
 6. 服务器返回 `processing` 处理中消息
 7. 服务器返回 `progress` 中间进度消息（可选，流式响应时使用）
-8. 服务器返回 `final_response` 最终响应消息
+8. 服务器返回多个 `stream_chunk` 字符级流式消息（可选，字符级流式响应时使用）
+9. 服务器返回 `final_response` 最终响应消息
 
 ### 6.2 代码示例：基本通信实现
 
@@ -241,6 +254,10 @@ ws.onmessage = (event) => {
         break;
       case 'processing':
         console.log('处理中:', data.message);
+        break;
+      case 'stream_chunk':
+        console.log('收到流式内容块:', data.content);
+        // 在UI中追加显示这个内容块，实现逐字显示效果
         break;
       case 'final_response':
         console.log('收到最终响应:', data.content);

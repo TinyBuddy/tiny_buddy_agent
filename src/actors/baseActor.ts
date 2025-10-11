@@ -25,6 +25,7 @@ export interface BaseActor {
 		input: string;
 		context: ActorContext;
 		plan?: unknown;
+		onStreamChunk?: (chunk: string) => void;
 	}): Promise<{ output: string; metadata?: Record<string, unknown> }>;
 
 	// 获取Actor状态

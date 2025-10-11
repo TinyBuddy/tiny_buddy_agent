@@ -215,10 +215,14 @@ class WebSocketMessageHandler {
 							);
 						}
 
-						// 发送正常的进度或最终响应消息
+						// 根据metadata类型决定消息类型
+						const messageType = metadata?.type === 'stream_chunk' ? 'stream_chunk' : 
+										   (isFinal ? "final_response" : "progress");
+
+						// 发送消息
 						ws.send(
 							JSON.stringify({
-								type: isFinal ? "final_response" : "progress",
+								type: messageType,
 								content,
 								isFinal,
 								timestamp: new Date().toISOString(),

@@ -1,7 +1,7 @@
 // import { deepseek } from "@ai-sdk/deepseek";
 import { openai } from "@ai-sdk/openai";
 
-import { generateText } from "ai";
+import { generateText, streamText } from "ai";
 import { config } from "dotenv";
 import { getFullSystemPrompt } from "../config/agentConfig";
 import type { ChildProfile } from "../models/childProfile";
@@ -75,13 +75,14 @@ export class ExecutionAgent implements BaseActor {
 		context: ActorContext;
 		plan?: ExecutionPlan;
 		relevantKnowledge?: any;
+		onStreamChunk?: (chunk: string) => void;
 	}): Promise<{ output: string; metadata?: Record<string, unknown> }> {
 		console.log("executionAgent process input :", input);
 
 		// 使用传入的计划
 		if (input.plan) {
 			this.currentPlan = input.plan;
-			this.state.currentInteractionType =
+			this.state.currentInteractionType = 
 				input.plan.interactionType || input.plan.type;
 			this.state.currentContentId = input.plan.contentId;
 
@@ -126,15 +127,10 @@ export class ExecutionAgent implements BaseActor {
 				console.log("executionAgent prompt :", prompt);
 
 				// 调用大模型生成初始响应
-				const result = await generateText({
-					// model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
-					  model: openai("gpt-4.1"),
+				const response = await this.generateResponse(
 					prompt,
-					maxOutputTokens: 300, // 增加token数以支持更长的响应
-					temperature: 0.7,
-				});
-
-				const response = result.text.trim();
+					input.onStreamChunk
+				);
 
 				// 确定交互类型
 				const interactionType = this.state.currentInteractionType || "chat";
@@ -165,8 +161,17 @@ export class ExecutionAgent implements BaseActor {
 					`Hey ${input.context.childProfile.name}! I'm Sparky the dinosaur! Let's be friends and learn Chinese together!`,
 					`Roar! Hi ${input.context.childProfile.name}! I'm Sparky! I can't wait to play and learn with you!`,
 				];
-				const defaultResponse =
+				const defaultResponse = 
 					greetings[Math.floor(Math.random() * greetings.length)];
+
+				// 如果提供了流式回调，模拟流式输出
+				if (input.onStreamChunk) {
+					const words = defaultResponse.split(' ');
+					for (let i = 0; i < words.length; i++) {
+						await new Promise(resolve => setTimeout(resolve, 100));
+						input.onStreamChunk(words[i] + (i < words.length - 1 ? ' ' : ''));
+					}
+				}
 
 				// 确定交互类型
 				const interactionType = this.state.currentInteractionType || "chat";
@@ -193,7 +198,7 @@ export class ExecutionAgent implements BaseActor {
 		}
 
 		// 处理用户消息
-		const response = await this.handleUserMessage(input.input, input.context);
+		const response = await this.handleUserMessage(input.input, input.context, input.onStreamChunk);
 
 		// 确定交互类型
 		const interactionType = this.state.currentInteractionType || "chat";
@@ -235,11 +240,23 @@ export class ExecutionAgent implements BaseActor {
 	private async handleUserMessage(
 		message: string,
 		context: ActorContext,
+		onStreamChunk?: (chunk: string) => void,
 	): Promise<string> {
 		// 在开发模式下，直接使用模拟响应
 		if (DEVELOPMENT_MODE) {
 			console.log("开发模式: 使用模拟用户消息响应");
-			return this.createMockResponse(message, context);
+			const mockResponse = this.createMockResponse(message, context);
+			
+			// 如果提供了流式回调，模拟流式输出
+			if (onStreamChunk) {
+				const words = mockResponse.split(' ');
+				for (let i = 0; i < words.length; i++) {
+					await new Promise(resolve => setTimeout(resolve, 100));
+					onStreamChunk(words[i] + (i < words.length - 1 ? ' ' : ''));
+				}
+			}
+			
+			return mockResponse;
 		}
 
 		const { childProfile, conversationHistory } = context;
@@ -253,20 +270,51 @@ export class ExecutionAgent implements BaseActor {
 			);
 
 			// 调用大模型生成响应
-			const result = await generateText({
-				// model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
-				model: openai("gpt-4.1"),
-				prompt,
-				maxOutputTokens: 200,
-				temperature: 0.7,
-			});
-
-			return result.text.trim();
+			return await this.generateResponse(prompt, onStreamChunk);
 		} catch (error) {
 			console.error("大模型调用失败:", error);
 			// 降级到默认响应
 			return "我现在有点忙，我们稍后再聊吧！";
 		}
+	}
+
+	// 生成大模型响应，支持流式输出
+	private async generateResponse(
+		prompt: string,
+		onStreamChunk?: (chunk: string) => void,
+	): Promise<string> {
+		let fullResponse = '';
+		
+		// 如果提供了流式回调，使用streamText并实现真正的流式输出
+		if (onStreamChunk) {
+			const result = await streamText({
+				// model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
+				model: openai("gpt-4.1"),
+				prompt,
+				maxOutputTokens: 300,
+				temperature: 0.7,
+			});
+			
+			// 处理真正的流式输出，逐字符接收并传递
+			fullResponse = '';
+			for await (const chunk of result.textStream) {
+				fullResponse += chunk;
+				onStreamChunk(chunk); // 直接传递每个字符块
+			}
+		} else {
+			// 否则使用普通的generateText
+			const result = await generateText({
+				// model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
+				model: openai("gpt-4.1"),
+				prompt,
+				maxOutputTokens: 300,
+				temperature: 0.7,
+			});
+			
+			fullResponse = result.text;
+		}
+		
+		return fullResponse.trim();
 	}
 
 	// 创建开发模式下的模拟问候语

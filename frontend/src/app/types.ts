@@ -2,6 +2,8 @@
 export interface Message {
   sender: string;
   content: string;
+  isStreaming?: boolean;
+  streamingId?: string;
 }
 
 // WebSocket消息数据接口

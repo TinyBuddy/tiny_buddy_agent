@@ -4,7 +4,7 @@ import readline from 'readline';
 import process from 'process';
 
 // 服务器配置
-const SERVER_ADDRESS = 'ws://localhost:3143'; // 替换为localhost
+const SERVER_ADDRESS = 'ws://47.250.116.113:3143'; // 更改为指定IP地址
 const CHILD_ID = 'test_child_cli';
 const CHILD_AGE = '8';
 const CHILD_INTERESTS = '编程,科学,音乐';
@@ -181,7 +181,9 @@ function startHeartbeat() {
   // 设置超时检测
   heartbeatTimeoutTimer = setTimeout(() => {
     console.error('心跳超时，关闭连接');
-    ws?.close(1001, '心跳超时');
+    if (ws) {
+      ws.close(1001, '心跳超时');
+    }
   }, HEARTBEAT_TIMEOUT);
 }
 
@@ -193,7 +195,9 @@ function resetHeartbeatTimeout() {
   
   heartbeatTimeoutTimer = setTimeout(() => {
     console.error('心跳超时，关闭连接');
-    ws?.close(1001, '心跳超时');
+    if (ws) {
+      ws.close(1001, '心跳超时');
+    }
   }, HEARTBEAT_TIMEOUT);
 }
 
@@ -215,7 +219,7 @@ function cleanupTimers() {
   }
 }
 
-// 发送用户输入消息
+// 发送完整的用户输入消息
 function sendUserMessage(message: string) {
   if (!ws || ws.readyState !== WebSocket.OPEN) {
     console.error('WebSocket未连接，无法发送消息');
@@ -230,6 +234,70 @@ function sendUserMessage(message: string) {
   };
   
   ws.send(JSON.stringify(userMessage));
+}
+
+// 流式发送用户输入消息（逐字发送）
+function sendUserMessageStream(message: string, delayMs: number = 200) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    console.error('WebSocket未连接，无法发送消息');
+    rl.prompt();
+    return;
+  }
+  
+  let index = 0;
+  const chars = message.split('');
+  
+  console.log('开始流式发送消息...');
+  
+  // 发送第一个字符
+  if (chars.length > 0) {
+    console.log(`发送: "${chars[0]}"`);
+    const firstCharMessage = {
+      type: 'user_input' as const,
+      userInput: chars[0],
+      childProfileId: CHILD_ID,
+      isStreaming: true,
+      isFinal: false
+    };
+    ws.send(JSON.stringify(firstCharMessage));
+    index++;
+  }
+  
+  // 递归发送剩余字符
+  function sendNextChar() {
+    if (index < chars.length) {
+      setTimeout(() => {
+        // 再次检查ws状态，因为异步执行期间可能发生变化
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          console.error('WebSocket连接已关闭，停止流式发送');
+          rl.prompt();
+          return;
+        }
+        
+        console.log(`发送: "${chars[index]}"`);
+        const charMessage = {
+          type: 'user_input' as const,
+          userInput: chars[index],
+          childProfileId: CHILD_ID,
+          isStreaming: true,
+          isFinal: index === chars.length - 1
+        };
+        ws.send(JSON.stringify(charMessage));
+        index++;
+        sendNextChar();
+      }, delayMs);
+    } else {
+      console.log('流式发送完成');
+      rl.prompt();
+    }
+  }
+  
+  // 继续发送剩余字符
+  if (chars.length > 1) {
+    sendNextChar();
+  } else {
+    rl.prompt();
+  }
 }
 
 // 处理用户输入
@@ -251,8 +319,27 @@ rl.on('line', (input) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'check_connection' }));
     }
+  } else if (input.trim().toLowerCase() === 'help') {
+    // 显示帮助信息
+    console.log('命令帮助:');
+    console.log('  exit - 退出程序');
+    console.log('  check - 检查连接状态');
+    console.log('  help - 显示帮助信息');
+    console.log('  stream:<消息> - 以流式方式发送消息（逐字发送）');
+    console.log('  直接输入消息 - 一次性发送完整消息');
+    rl.prompt();
+  } else if (input.trim().toLowerCase().startsWith('stream:')) {
+    // 以流式方式发送消息
+    const message = input.trim().substring('stream:'.length);
+    if (message.trim()) {
+      console.log(`准备以流式方式发送消息: ${message}`);
+      sendUserMessageStream(message);
+    } else {
+      console.log('请在stream:后输入要发送的消息');
+      rl.prompt();
+    }
   } else {
-    // 发送用户消息
+    // 一次性发送完整消息
     sendUserMessage(input);
   }
 });
@@ -261,7 +348,9 @@ rl.on('line', (input) => {
 process.on('SIGINT', () => {
   console.log('用户中断程序');
   cleanupTimers();
-  ws?.close(1000, '用户中断');
+  if (ws) {
+    ws.close(1000, '用户中断');
+  }
   rl.close();
   process.exit(0);
 });
