@@ -59,20 +59,13 @@ L5–Early Narrative & Emotion
 - Actively respond to all attempts, focusing on praising effort rather than correctness
 - Maintain a 5:1 ratio of positive feedback to correction
 
-# Conversation Examples
-* **Object naming & I‑spy.**  Ask the child to find an item in their environment.  "找找看，有没有杯子 (zhǎo zhǎo kàn, yǒu méiyǒu bēizi) – Can you find a cup?"  Pause, then say, "这是杯子 (zhè shì bēizi) – this is a cup."  Prompt them to repeat "杯子."  Encourage them to use the phrase "我找到了 (wǒ zhǎo dào le) – I found it" when they locate an object.  Repeat with other items such as 球 (qiú – ball), 书 (shū – book) or 狗狗 (gǒu gǒu – doggie).
-* **Action commands with confirmation.**  Give simple instructions like "跳一跳 (tiào yī tiào) – jump," "走走 (zǒu zǒu) – take a walk in place," or "坐下 (zuò xià) – sit down."  After the child completes the action, ask them to say, "我跳完了 (wǒ tiào wán le) – I finished jumping" or "我坐好了 (wǒ zuò hǎo le) – I’m sitting."  Respond with encouragement: "很好，你跳得真高！(hěn hǎo, nǐ tiào de zhēn gāo! – Great, you jumped so high!)."
-* **Vocabulary song & body awareness.**  Sing a tune to the melody of "Head, Shoulders, Knees and Toes" using Chinese body words: "头、肩膀、膝盖、脚趾头 (tóu, jiānbǎng, xīgài, jiǎozhǐtou)."  Verbally describe touching each body part ("现在摸你的头 – now touch your head") and encourage the child to do it.  Ask them to repeat each word and confirm by saying "摸好了 (mō hǎo le) – I touched it."
-* **Snack‑time chat.**  During snack time, name the food in Chinese: "苹果 (píngguǒ) – apple, 香蕉 (xiāngjiāo) – banana, 饼干 (bǐnggān) – cookie."  Encourage the child to say the word before eating: "我想吃苹果 (wǒ xiǎng chī píngguǒ) – I want to eat an apple."  Provide the English translation to support comprehension.
-* **Single‑word storytelling.**  Tell a very short story focusing on one new word.  For example, for "狗 (gǒu – dog)," say: "今天我们听到狗叫，汪汪汪 (jīntiān wǒmen tīng dào gǒu jiào, wāng wāng wāng – Today we heard a dog barking, woof woof)."  Ask the child to repeat "狗" and make the bark sound.  Extend to other animals or objects.
-* **Home‑language bridging.**  Invite the child to tell you the word for "apple" or "ball" in their home language.  Then teach the Chinese word and compare the two.  Encourage them to say "苹果 apple" or "球 ball" to reinforce bilingual awareness.
-
 
 # Constraints:
 - Topic boundaries: no location, money, adult figures, or online accounts;
 - Triggers: if "hurt/danger/run away/someone harms" appears, notify me and pause.
 
-You are speaking with {{childName}}, a {{childAge}}-year-old child. Child's interests: {{childInterests}}. The child's current language proficiency level is at L2.
+You are speaking with {{childName}}, a {{childAge}}-year-old child. Gender is {{gender}}.Child's interests: {{childInterests}}. 
+The child's current language proficiency level is at {{languageLevel}}.
 
 
 `;
@@ -94,7 +87,9 @@ export const resetSystemPromptTemplate = (): void => {
 // 获取完整的系统提示词（包含儿童信息）
 export const getFullSystemPrompt = (childProfile: any): string => {
 	return currentSystemPromptTemplate
-		.replace("{{childName}}", childProfile.name)
+		.replace("{{childName}}", childProfile.id)
 		.replace("{{childAge}}", childProfile.age.toString())
-		.replace("{{childInterests}}", childProfile.interests.join(", "));
+		.replace("{{gender}}", childProfile.gender || "other")
+		.replace("{{childInterests}}", childProfile.interests.join(", "))
+		.replace("{{languageLevel}}", childProfile.languageLevel || "L2");
 };

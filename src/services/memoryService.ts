@@ -3,6 +3,12 @@ import type { ChildProfile } from "../models/childProfile";
 import { createDefaultChildProfile } from "../models/childProfile";
 import type { ConversationHistory, Message } from "../models/message";
 import { createMessage } from "../models/message";
+import { 
+  createChildProfile as dbCreateChildProfile,
+  getChildProfileById as dbGetChildProfileById,
+  updateChildProfile as dbUpdateChildProfile,
+  listChildProfiles as dbListChildProfiles,
+} from '../db/db';
 
 // 记忆服务接口
 export interface MemoryService {
@@ -61,18 +67,58 @@ export class InMemoryMemoryService implements MemoryService {
 	async getChildProfile(childId: string): Promise<ChildProfile> {
 		await this.ensureInitialized();
 
-		// 如果找不到儿童档案，创建默认档案
-		if (!this.childProfiles.has(childId)) {
-			const defaultProfile = createDefaultChildProfile(childId);
-			this.childProfiles.set(childId, defaultProfile);
-			return defaultProfile;
+		// 首先尝试从内存获取
+		if (this.childProfiles.has(childId)) {
+			const profile = this.childProfiles.get(childId);
+			if (profile) {
+				return { ...profile };
+			}
 		}
 
-		const profile = this.childProfiles.get(childId);
-		if (!profile) {
-			throw new Error(`Child profile not found for id: ${childId}`);
+		// 如果内存中找不到，尝试从数据库获取
+		try {
+			const dbProfile = await dbGetChildProfileById(childId);
+			if (dbProfile) {
+				// 转换gender字段类型以匹配接口定义
+				const formattedProfile: ChildProfile = {
+					id: dbProfile.id,
+					name: dbProfile.name,
+					age: dbProfile.age,
+					gender: (dbProfile.gender as "male" | "female" | "other") || "other",
+					preferredLanguage: dbProfile.preferredLanguage,
+					interests: Array.isArray(dbProfile.interests) ? dbProfile.interests : [],
+					dislikes: Array.isArray(dbProfile.dislikes) ? dbProfile.dislikes : [],
+					learningProgress: typeof dbProfile.learningProgress === 'object' && !Array.isArray(dbProfile.learningProgress) && dbProfile.learningProgress !== null ? (dbProfile.learningProgress as Record<string, number>) : {},
+					lastInteraction: new Date(dbProfile.lastInteraction),
+					languageLevel: dbProfile.languageLevel || undefined
+				};
+				// 同步到内存
+				this.childProfiles.set(childId, formattedProfile);
+				return formattedProfile;
+			}
+		} catch (error) {
+			console.warn(`从数据库获取儿童档案失败，继续使用内存模式: ${error}`);
 		}
-		return { ...profile };
+
+		// 如果数据库也找不到，创建默认档案
+		const defaultProfile = createDefaultChildProfile(childId);
+		this.childProfiles.set(childId, defaultProfile);
+
+		// 保存默认档案到数据库
+		try {
+			// 为数据库创建包含所需字段的对象
+			const dbProfile = {
+				...defaultProfile,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			};
+			await dbCreateChildProfile(dbProfile);
+			console.log(`儿童默认档案已成功创建并保存到数据库: ${childId}`);
+		} catch (error) {
+			console.warn(`保存儿童默认档案到数据库失败: ${error}`);
+		}
+
+		return defaultProfile;
 	}
 
 	async updateChildProfile(
@@ -91,7 +137,17 @@ export class InMemoryMemoryService implements MemoryService {
 			lastInteraction: new Date(),
 		};
 
+		// 更新内存中的档案
 		this.childProfiles.set(childId, updatedProfile);
+
+		// 异步更新数据库中的档案
+		try {
+			await dbUpdateChildProfile(childId, updatedProfile);
+			console.log(`儿童档案已成功更新到数据库: ${childId}`);
+		} catch (error) {
+			console.warn(`更新数据库中的儿童档案失败: ${error}`);
+		}
+
 		return updatedProfile;
 	}
 
@@ -107,7 +163,23 @@ export class InMemoryMemoryService implements MemoryService {
 			lastInteraction: new Date(),
 		};
 
+		// 保存到内存
 		this.childProfiles.set(childId, newProfile);
+
+		// 异步保存到数据库
+		try {
+			// 为数据库创建包含所需字段的对象
+			const dbProfile = {
+				...newProfile,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			};
+			await dbCreateChildProfile(dbProfile);
+			console.log(`儿童档案已成功创建并保存到数据库: ${childId}`);
+		} catch (error) {
+			console.warn(`保存儿童档案到数据库失败: ${error}`);
+		}
+
 		return newProfile;
 	}
 
@@ -302,6 +374,27 @@ export class InMemoryMemoryService implements MemoryService {
 	// 获取所有儿童ID
 	async getAllChildIds(): Promise<string[]> {
 		await this.ensureInitialized();
+
+		try {
+			// 尝试从数据库获取所有儿童档案
+			const dbProfiles = await dbListChildProfiles();
+			if (dbProfiles && dbProfiles.length > 0) {
+				const dbIds = dbProfiles.map(profile => profile.id);
+				// 确保内存中的ID也包含数据库中的ID
+				dbIds.forEach(id => {
+					if (!this.childProfiles.has(id)) {
+						// 如果内存中没有该ID的档案，创建一个占位符
+						// 实际数据会在getChildProfile时从数据库加载
+						this.childProfiles.set(id, { id } as ChildProfile);
+					}
+				});
+				return dbIds;
+			}
+		} catch (error) {
+			console.warn(`从数据库获取儿童ID列表失败，使用内存中的ID: ${error}`);
+		}
+
+		// 如果数据库操作失败，返回内存中的ID
 		return Array.from(this.childProfiles.keys());
 	}
 }

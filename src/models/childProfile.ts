@@ -9,6 +9,7 @@ export interface ChildProfile {
 	dislikes: string[];
 	learningProgress: Record<string, number>; // 各知识点的学习进度
 	lastInteraction: Date;
+	languageLevel?: string; // 语言水平 (L1-L5)
 }
 
 // 创建默认儿童档案
@@ -22,4 +23,5 @@ export const createDefaultChildProfile = (id: string): ChildProfile => ({
 	dislikes: ["危险物品"],
 	learningProgress: {},
 	lastInteraction: new Date(),
+	languageLevel: "L2", // 默认语言水平为L2
 });

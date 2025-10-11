@@ -352,6 +352,7 @@ export class ExecutionAgent implements BaseActor {
 		}
 
 		if (plan?.strategy) {
+			console.log("promt add Teaching strategy:", plan.strategy);
 			systemPrompt += `\n\nTeaching strategy for this interaction: ${plan.strategy}\n`;
 		}
 

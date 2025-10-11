@@ -141,6 +141,7 @@ export class PlanningAgent implements BaseActor {
 	}
 
 	async init(context?: ActorContext): Promise<void> {
+		console.log("初始化 PlanningAgent");
 		// 初始化逻辑
 		this.state = {
 			initialized: true,
@@ -376,7 +377,7 @@ export class PlanningAgent implements BaseActor {
 			try {
 				// 从返回结果中提取JSON部分
 				const text = result.text.trim();
-				console.log("LLM天级别计划原始响应:", text);
+				// console.log("LLM天级别计划原始响应:", text);
 
 				// 尝试多种方式提取JSON
 				let jsonStr: string | null = null;
@@ -620,7 +621,7 @@ export class PlanningAgent implements BaseActor {
 		// 调用大模型生成规划
 		const result = await generateText({
 			// model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
-      model: openai("gpt-4.1"),
+			model: openai("gpt-4.1"),
 			prompt,
 			maxOutputTokens: 500,
 			temperature: 0.6,

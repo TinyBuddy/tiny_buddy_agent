@@ -75,6 +75,7 @@ export class LongtermPlanningAgent implements BaseActor {
 	}
 
 	async init(context?: ActorContext): Promise<void> {
+		console.log("初始化 LongtermPlanningAgent");
 		// 初始化逻辑
 		this.state = {
 			initialized: true,
@@ -290,7 +291,11 @@ export class LongtermPlanningAgent implements BaseActor {
 			.map((m) => `${m.type === "user" ? "User" : "Assistant"}: ${m.content}`)
 			.join("\n");
 
-		return `You are a professional children's companion assistant planner, and you need to create an interaction plan for ${childProfile.name} (${childProfile.age} years old).\nChild Interests and Hobbies: ${childProfile.interests.join(", ")}\nRecent Conversation History:\n${messagesText}\nAvailable Knowledge Base Content:\n${knowledgeSummary}\nBased on the child's age, interests, recent conversations, and available knowledge base, generate a detailed interaction plan.Extract Chinese vocabulary mentioned in the dialogue, then store these terms in memory. Each child (childID) is recorded separately in a Map format.\nInteraction types can be: chat, song, story, game, lesson\nPlease return in JSON format with the following fields:\n- interactionType: interaction type\n- contentId: ID of knowledge base content that can be used (if any)\n- objectives: array of interaction objectives\n- strategy: interaction strategy description\nPlease ensure the JSON format is correct and does not include any additional text.`;
+		// 确保 interests 字段存在且是数组
+		const interests = Array.isArray(childProfile.interests) ? childProfile.interests : [];
+		const interestsText = interests.join(", ") || "暂无兴趣记录";
+
+		return `You are a professional children's companion assistant planner, and you need to create an interaction plan for ${childProfile.name} (${childProfile.age} years old).\nChild Interests and Hobbies: ${interestsText}\nRecent Conversation History:\n${messagesText}\nAvailable Knowledge Base Content:\n${knowledgeSummary}\nBased on the child's age, interests, recent conversations, and available knowledge base, generate a detailed interaction plan.Extract Chinese vocabulary mentioned in the dialogue, then store these terms in memory. Each child (childID) is recorded separately in a Map format.\nInteraction types can be: chat, song, story, game, lesson\nPlease return in JSON format with the following fields:\n- interactionType: interaction type\n- contentId: ID of knowledge base content that can be used (if any)\n- objectives: array of interaction objectives\n- strategy: interaction strategy description\nPlease ensure the JSON format is correct and does not include any additional text.`;
 	}
 
 	// 使用大模型生成规划

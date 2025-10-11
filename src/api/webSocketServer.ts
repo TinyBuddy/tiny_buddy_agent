@@ -98,21 +98,55 @@ class WebSocketMessageHandler {
 	}
 
 	private async handleInitialize(
-		ws: WebSocket,
-		message: { type: string; childProfileId?: string },
-	): Promise<void> {
+			ws: WebSocket,
+			message: { type: string; childProfileId?: string; childAge?: number; childInterests?: string[] | string; languageLevel?: string; gender?: string },
+		): Promise<void> {
 		try {
 			// 初始化儿童档案
 			const childProfileId = message.childProfileId || "default_child";
 
 			// 检查是否需要创建新的儿童档案
 			let childProfile: ChildProfile;
+			let needsUpdate = false;
 			try {
 				childProfile = await app.getChildProfile(childProfileId);
 			} catch {
 				// 如果不存在，创建默认档案
 				childProfile = createDefaultChildProfile(childProfileId);
 				await app.updateChildProfile(childProfileId, childProfile);
+			}
+
+			// 如果提供了childAge、childInterests、languageLevel和gender，则更新儿童档案
+			const updates: Partial<ChildProfile> = {};
+			if (message.childAge !== undefined) {
+				updates.age = message.childAge;
+				needsUpdate = true;
+			}
+			if (message.languageLevel !== undefined) {
+				updates.languageLevel = message.languageLevel;
+				needsUpdate = true;
+			}
+			if (message.gender !== undefined && ['male', 'female', 'other'].includes(message.gender)) {
+				updates.gender = message.gender as 'male' | 'female' | 'other';
+				needsUpdate = true;
+			}
+			if (message.childInterests !== undefined) {
+				// 处理字符串类型的childInterests，将其按逗号分割成数组
+				if (typeof message.childInterests === 'string') {
+					// 使用类型断言明确告诉TypeScript这是字符串类型
+					const interestsStr = message.childInterests as string;
+					updates.interests = interestsStr.split(',').map((interest: string) => interest.trim()).filter((interest: string) => interest.length > 0);
+				} else if (Array.isArray(message.childInterests)) {
+					updates.interests = message.childInterests;
+				}
+				needsUpdate = true;
+			}
+
+			// 如果有更新，保存到数据库
+			if (needsUpdate) {
+				await app.updateChildProfile(childProfileId, updates);
+				// 重新获取更新后的档案
+				childProfile = await app.getChildProfile(childProfileId);
 			}
 
 			// 返回初始化成功消息

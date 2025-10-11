@@ -1,0 +1,24 @@
+{
+  "name": "tiny-buddy-standalone-sdk",
+  "version": "1.0.0",
+  "description": "TinyBuddy SDK独立运行示例",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^14.2.5",
+    "react": "^18",
+    "react-dom": "^18",
+    "typescript": "^5.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "8.57.1",
+    "eslint-config-next": "15.5.4"
+  }
+}

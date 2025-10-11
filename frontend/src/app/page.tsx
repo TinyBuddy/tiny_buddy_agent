@@ -1,16 +1,15 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import {
-  Message,
-  WebSocketMessageData,
-  UpdatePromptMessageData,
-} from "./types";
+import { Message, WebSocketMessageData, WebSocketInitData } from "./types";
 
 export default function ChatInterface() {
   // 状态管理
   const [childID, setChildID] = useState<string>("");
-  const [prompt, setPrompt] = useState<string>("你是一个AI助手，帮助用户解答问题。"); // 设置默认提示词，确保可以自动连接
+  const [childAge, setChildAge] = useState<string>("");
+  const [childInterests, setChildInterests] = useState<string>("");
+  const [languageLevel, setLanguageLevel] = useState<string>("");
+  const [gender, setGender] = useState<string>("");
   const [chatMessage, setChatMessage] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [socket, setSocket] = useState<WebSocket | null>(null);
@@ -34,16 +33,30 @@ export default function ChatInterface() {
 
     // 创建连接函数
     const createConnection = () => {
-      if (!childID || !prompt) return;
+      if (!childID) return;
 
       // 设置连接状态为连接中
       setConnectionStatus("connecting");
 
       try {
         // 创建WebSocket连接
-        ws = new WebSocket(
-          `ws://localhost:3143?childID=${childID}&prompt=${encodeURIComponent(prompt)}`,
-        );
+        // 构建WebSocket URL，添加childAge和childInterests参数
+          const wsUrl = new URL('ws://localhost:3143');
+          wsUrl.searchParams.append('childID', childID);
+          if (childAge) {
+            wsUrl.searchParams.append('childAge', childAge);
+          }
+          if (childInterests) {
+            wsUrl.searchParams.append('childInterests', childInterests);
+          }
+          if (languageLevel) {
+            wsUrl.searchParams.append('languageLevel', languageLevel);
+          }
+          if (gender) {
+            wsUrl.searchParams.append('gender', gender);
+          }
+          
+          ws = new WebSocket(wsUrl.toString());
 
         // 连接打开时的处理
         ws.onopen = () => {
@@ -68,11 +81,28 @@ export default function ChatInterface() {
           // 启动心跳机制
           startHeartbeat();
 
-          // 发送初始化消息
+          // 发送初始化消息，包含childAge和childInterests
           if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(
-              JSON.stringify({ type: "initialize", childProfileId: childID }),
-            );
+            const initMessage: WebSocketInitData = {
+              type: "initialize",
+              childProfileId: childID
+            };
+            
+            // 仅当有值时才添加参数
+            if (childAge) {
+              initMessage.childAge = childAge;
+            }
+            if (childInterests) {
+              initMessage.childInterests = childInterests;
+            }
+            if (languageLevel) {
+              initMessage.languageLevel = languageLevel;
+            }
+            if (gender) {
+              initMessage.gender = gender;
+            }
+            
+            ws.send(JSON.stringify(initMessage));
           }
         };
 
@@ -165,7 +195,7 @@ export default function ChatInterface() {
             );
 
             setTimeout(() => {
-              if (childID && prompt) {
+              if (childID) {
                 // 确保重连时配置仍然有效
                 createConnection();
               }
@@ -337,9 +367,8 @@ export default function ChatInterface() {
     // 组件卸载时关闭连接
     return () => {
       cleanup();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [childID, prompt]); // 注意：不包含messages.length作为依赖，因为它会导致消息变化时重新创建连接
+    };  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [childID, childAge, childInterests, languageLevel, gender]); // 注意：不包含messages.length作为依赖，因为它会导致消息变化时重新创建连接
 
   // 发送消息
   const sendMessage = () => {
@@ -376,28 +405,7 @@ export default function ChatInterface() {
     }
   };
 
-  // 更新提示词
-  const updatePrompt = () => {
-    if (socket && isConnected && prompt.trim()) {
-      try {
-        const updateMessage: UpdatePromptMessageData = {
-          type: "update_prompt",
-          prompt: prompt,
-        };
-        socket.send(JSON.stringify(updateMessage));
-        setMessages((prev) => [
-          ...prev,
-          { sender: "系统", content: "正在更新系统提示词..." },
-        ]);
-      } catch (error) {
-        console.error("更新提示词失败:", error);
-        setMessages((prev) => [
-          ...prev,
-          { sender: "系统", content: "更新提示词失败，请检查连接状态" },
-        ]);
-      }
-    }
-  };
+
 
   // 自动滚动到最新消息
   const scrollToBottom = () => {
@@ -530,30 +538,69 @@ export default function ChatInterface() {
               </div>
               <div>
                 <label
-                  htmlFor="prompt"
+                  htmlFor="childAge"
                   className="block text-sm font-medium mb-1"
                 >
-                  Prompt
+                  孩子年龄
                 </label>
-                {/* 隐藏的Prompt输入框 */}
-                <textarea
-                  id="prompt"
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  className="hidden w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                  placeholder="请输入Prompt"
-                  rows={6}
+                <input
+                  id="childAge"
+                  type="text"
+                  value={childAge}
+                  onChange={(e) => setChildAge(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  placeholder="请输入孩子年龄"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="childInterests"
+                  className="block text-sm font-medium mb-1"
+                >
+                  孩子兴趣
+                </label>
+                <input
+                  id="childInterests"
+                  type="text"
+                  value={childInterests}
+                  onChange={(e) => setChildInterests(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  placeholder="请输入孩子兴趣"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="languageLevel"
+                  className="block text-sm font-medium mb-1"
+                >
+                  语言水平
+                </label>
+                <input
+                  id="languageLevel"
+                  type="text"
+                  value={languageLevel}
+                  onChange={(e) => setLanguageLevel(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  placeholder="请输入语言水平 (L1-L5)"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="gender"
+                  className="block text-sm font-medium mb-1"
+                >
+                  性别
+                </label>
+                <input
+                  id="gender"
+                  type="text"
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  placeholder="请输入性别 (male/female/other)"
                 />
               </div>
               <div className="space-y-4 mt-auto">
-                {/* 隐藏的更新提示词按钮 */}
-                <button
-                  onClick={updatePrompt}
-                  disabled={!isConnected || !prompt.trim()}
-                  className={`hidden w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors ${!isConnected || !prompt.trim() ? "opacity-50 cursor-not-allowed" : ""}`}
-                >
-                  更新系统提示词
-                </button>
                 {/* 连接状态显示 */}
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   {connectionStatus === "connected" ? (
@@ -585,7 +632,7 @@ export default function ChatInterface() {
                     className={`mb-4 ${msg.sender.startsWith("用户") ? "ml-auto" : "mr-auto"} max-w-[80%]`}
                   >
                     <div
-                      className={`p-3 rounded-lg ${msg.sender.startsWith("用户") ? "bg-blue-500 text-white" : msg.isPromptMessage ? "bg-purple-100 dark:bg-purple-900 text-gray-900 dark:text-gray-100 border border-purple-300 dark:border-purple-700" : "bg-green-100 dark:bg-green-900 text-gray-900 dark:text-gray-100"}`}
+                      className={`p-3 rounded-lg ${msg.sender.startsWith("用户") ? "bg-blue-500 text-white" : "bg-green-100 dark:bg-green-900 text-gray-900 dark:text-gray-100"}`}
                     >
                       <div className="font-semibold mb-1 flex justify-between items-center">
                         {msg.sender}
@@ -601,17 +648,7 @@ export default function ChatInterface() {
                         )}
                       </div>
                       <div>
-                        {/* 处理系统提示词的换行 */}
-                        {msg.isPromptMessage ? (
-                          msg.content.split('\n').map((line, i) => (
-                            <React.Fragment key={i}>
-                              {line}
-                              {i < msg.content.split('\n').length - 1 && <br />}
-                            </React.Fragment>
-                          ))
-                        ) : (
-                          msg.content
-                        )}
+                        {msg.content}
                       </div>
                     </div>
                   </div>
