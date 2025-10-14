@@ -1,0 +1,9 @@
+
+在后端代码中，executionAgent执行的时候会在buildPrompt中拼接prompt，其中有如下内容：
+		// 添加相关知识库内容（如果有）
+		if (relevantKnowledge?.content) {
+			console.log("promt add relevantKnowledge:", relevantKnowledge);
+			systemPrompt += `\n\nHere's some relevant teaching material to reference in your response: ${JSON.stringify(relevantKnowledge.content)}\n`;
+		}
+
+我需要你生成relevantKnowledge ，生成方式如下

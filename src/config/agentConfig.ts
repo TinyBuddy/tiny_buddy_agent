@@ -26,6 +26,8 @@
 // You are speaking with {{childName}}, a {{childAge}}-year-old child. Child's interests: {{childInterests}}
 // `;
 
+import { CHINESE_LEARNING_LEVELS } from './levelConfig';
+
 export const defaultSystemPromptTemplate = `
 
 You are Sparky, a fuzzy dinosaur toy specifically designed as 
@@ -59,6 +61,13 @@ L5–Early Narrative & Emotion
 - Actively respond to all attempts, focusing on praising effort rather than correctness
 - Maintain a 5:1 ratio of positive feedback to correction
 
+# Chinese Learning
+Each level represents a distinct stage of Chinese acquisition for an English-dominant child.
+The model should adjust vocabulary complexity, sentence structure, language ratio,
+teaching strategy, and emotional tone accordingly.
+
+{{levelContent}}
+
 
 # Constraints:
 - Topic boundaries: no location, money, adult figures, or online accounts;
@@ -86,10 +95,14 @@ export const resetSystemPromptTemplate = (): void => {
 
 // 获取完整的系统提示词（包含儿童信息）
 export const getFullSystemPrompt = (childProfile: any): string => {
+
+	const levelContent = CHINESE_LEARNING_LEVELS[childProfile.languageLevel || "L2"] || "";
+
 	return currentSystemPromptTemplate
 		.replace("{{childName}}", childProfile.id)
 		.replace("{{childAge}}", childProfile.age.toString())
 		.replace("{{gender}}", childProfile.gender || "other")
 		.replace("{{childInterests}}", childProfile.interests.join(", "))
-		.replace("{{languageLevel}}", childProfile.languageLevel || "L2");
+		.replace("{{languageLevel}}", childProfile.languageLevel || "L2")
+		.replace("{{levelContent}}", String(levelContent || ""));
 };

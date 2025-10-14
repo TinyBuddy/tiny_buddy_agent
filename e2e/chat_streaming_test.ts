@@ -2,13 +2,14 @@
 import { WebSocket } from 'ws';
 
 // 连接配置
-const SERVER_URL = 'ws://localhost:3143';
+const SERVER_URL = 'ws://47.250.116.113:3143';
 const CHILD_ID = 'e2e_test_streaming';
 const TEST_MESSAGE = '你好，TinyBuddy！我想测试一下你的流式输出功能。';
 
 // 记录开始时间和收到的流数据
 let startTime: number;
-let receivedStreamData: string[] = [];
+let receivedStreamData: string[] = []; // 包含所有类型的流数据（包括系统消息）
+let actualChatResponse: string[] = []; // 仅包含实际的对话内容（字符级流数据）
 let receivedFinalResponse: string = '';
 let isTestComplete = false;
 let streamChunkCount = 0;
@@ -45,6 +46,8 @@ ws.on('open', () => {
 // 消息接收事件
 ws.on('message', (data) => {
   try {
+    // 打印原始响应
+    console.log('原始响应:', data.toString());
     const message = JSON.parse(data.toString());
     
     if (message.type === 'initialized') {
@@ -69,6 +72,7 @@ ws.on('message', (data) => {
     if (message.type === 'stream_chunk') {
       const chunk = message.content || '';
       receivedStreamData.push(chunk);
+      actualChatResponse.push(chunk); // 仅将实际对话内容添加到专用数组
       streamChunkCount++;
       
       // 在终端中一个字符一个字符地打印
@@ -137,11 +141,13 @@ ws.on('close', (code, reason) => {
     const totalTime = endTime - startTime;
     
     console.log('✅ 测试通过: 成功接收字符级流式输出');
-    console.log('流式响应总长度:', completeStreamResponse.length, '字符');
+    console.log('总响应长度(含系统消息):', completeStreamResponse.length, '字符');
+    console.log('对话内容长度:', actualChatResponse.join('').length, '字符');
     console.log('流数据块数量:', receivedStreamData.length);
     console.log('字符级流数据块数量:', streamChunkCount);
     console.log('总耗时:', totalTime, '毫秒');
-    console.log('\n完整流式响应:\n', completeStreamResponse);
+    console.log('\n完整对话内容:\n', actualChatResponse.join(''));
+    console.log('\n完整流式响应(含系统消息):\n', completeStreamResponse);
   } else if (receivedStreamData.length > 1) {
     // 如果收到多个流数据块，说明流式输出正常工作
     const endTime = Date.now();
