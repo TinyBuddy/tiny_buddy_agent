@@ -2,6 +2,8 @@ nohup npm run dev </dev/null > dev.log 2>&1 &
 exit
 
 
+nohup npm run start </dev/null > dev.log 2>&1 &
+exit
 
 nohup ./main </dev/null > dev.log 2>&1 &
 exit

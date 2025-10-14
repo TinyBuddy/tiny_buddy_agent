@@ -26,7 +26,7 @@
 // You are speaking with {{childName}}, a {{childAge}}-year-old child. Child's interests: {{childInterests}}
 // `;
 
-import { CHINESE_LEARNING_LEVELS } from './levelConfig';
+import { CHINESE_LEARNING_LEVELS, generateLevelDescription } from './levelConfig';
 
 export const defaultSystemPromptTemplate = `
 
@@ -96,7 +96,7 @@ export const resetSystemPromptTemplate = (): void => {
 // 获取完整的系统提示词（包含儿童信息）
 export const getFullSystemPrompt = (childProfile: any): string => {
 
-	const levelContent = CHINESE_LEARNING_LEVELS[childProfile.languageLevel || "L2"] || "";
+	const levelContent = generateLevelDescription(childProfile.languageLevel);
 
 	return currentSystemPromptTemplate
 		.replace("{{childName}}", childProfile.id)
