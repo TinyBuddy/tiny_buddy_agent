@@ -6,4 +6,12 @@
 			systemPrompt += `\n\nHere's some relevant teaching material to reference in your response: ${JSON.stringify(relevantKnowledge.content)}\n`;
 		}
 
-我需要你生成relevantKnowledge ，生成方式如下
+我需要你生成relevantKnowledge 并拼接在systemPrompt中，生成方式如下：
+你需要调用一个API接口，接口为一个post请求  如下
+ 'http://136.115.118.154/api/v1/knowledge-chat/d15b185a-a786-4039-b15b-1d6fb4a8d4e3' --header 'X-API-Key: sk-AFVxhsKKYpfMSSIho5hyqskh8Rbd96ZbVytFRy3pan09Vn1g' --header 'Content-Type: application/json' --data '{
+    "query": "hello"
+}'
+
+和Knowledge对接的逻辑代码是不是可以放在services目录下面
+
+
