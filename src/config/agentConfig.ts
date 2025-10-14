@@ -96,13 +96,15 @@ export const resetSystemPromptTemplate = (): void => {
 // 获取完整的系统提示词（包含儿童信息）
 export const getFullSystemPrompt = (childProfile: any): string => {
 
-	const levelContent = generateLevelDescription(childProfile.languageLevel);
+	// 将languageLevel转换为大写以忽略大小写
+	const normalizedLanguageLevel = childProfile.languageLevel?.toUpperCase() || "L2";
+	const levelContent = generateLevelDescription(normalizedLanguageLevel);
 
 	return currentSystemPromptTemplate
 		.replace("{{childName}}", childProfile.id)
 		.replace("{{childAge}}", childProfile.age.toString())
 		.replace("{{gender}}", childProfile.gender || "other")
 		.replace("{{childInterests}}", childProfile.interests.join(", "))
-		.replace("{{languageLevel}}", childProfile.languageLevel || "L2")
+		.replace("{{languageLevel}}", normalizedLanguageLevel)
 		.replace("{{levelContent}}", String(levelContent || ""));
 };
