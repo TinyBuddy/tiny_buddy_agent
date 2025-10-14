@@ -1,5 +1,5 @@
-import { deepseek } from "@ai-sdk/deepseek";
-// import { openai } from "@ai-sdk/openai";
+// import { deepseek } from "@ai-sdk/deepseek";
+import { openai } from "@ai-sdk/openai";
 import axios from 'axios';
 import { generateText, streamText } from "ai";
 import { config } from "dotenv";
@@ -517,8 +517,8 @@ export class ExecutionAgent implements BaseActor {
 		// 如果提供了流式回调，使用streamText并实现真正的流式输出
 		if (onStreamChunk) {
 			const result = await streamText({
-				model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
-				// model: openai("gpt-4.1"),
+				// model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
+				model: openai("gpt-4.1"),
 				prompt,
 				maxOutputTokens: 300,
 				temperature: 0.7,
@@ -533,8 +533,8 @@ export class ExecutionAgent implements BaseActor {
 		} else {
 			// 否则使用普通的generateText
 			const result = await generateText({
-				model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
-				// model: openai("gpt-4.1"),
+				// model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
+				model: openai("gpt-4.1"),
 				prompt,
 				maxOutputTokens: 300,
 				temperature: 0.7,
