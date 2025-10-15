@@ -1,4 +1,4 @@
-import { deepseek } from "@ai-sdk/deepseek";
+// import { deepseek } from "@ai-sdk/deepseek";
 import { openai } from "@ai-sdk/openai";
 import axios from 'axios';
 import { generateText, streamText } from "ai";
