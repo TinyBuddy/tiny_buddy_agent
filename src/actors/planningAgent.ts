@@ -604,10 +604,10 @@ export class PlanningAgent implements BaseActor {
 		context: ActorContext,
 	): Promise<PlanningResult> {
 		const { childProfile, conversationHistory, knowledgeBase } = context;
-		const recentMessages = this.getRecentMessages(conversationHistory, 5);
+		const recentMessages = this.getRecentMessages(conversationHistory, 10);
 		const knowledgeSummary = this.summarizeKnowledgeBase(knowledgeBase);
 
-		console.log("规划agent 调用最近5条消息:", recentMessages);
+		console.log("规划agent 调用最近10条消息:", recentMessages);
 
 		// 构建规划提示词
 		const prompt = this.buildPlanningPrompt(
@@ -725,7 +725,7 @@ export class PlanningAgent implements BaseActor {
 
 		return `You are a professional children's companion assistant planner, 
 		and you need to create an interaction plan for 
-		${childProfile.name} (${childProfile.age} years old).\nChild Interests and 
+		 (${childProfile.age} years old child).\nChild Interests and 
 		Hobbies: ${childProfile.interests.join(", ")}\nRecent Conversation 
 		History:\n${messagesText}\nAvailable Knowledge Base 
 		Content:\n${knowledgeSummary}\nBased on the child's age, interests, 
