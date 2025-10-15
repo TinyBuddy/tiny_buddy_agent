@@ -723,7 +723,28 @@ export class PlanningAgent implements BaseActor {
 			.map((m) => `${m.type === "user" ? "User" : "Assistant"}: ${m.content}`)
 			.join("\n");
 
-		return `You are a professional children's companion assistant planner, and you need to create an interaction plan for ${childProfile.name} (${childProfile.age} years old).\nChild Interests and Hobbies: ${childProfile.interests.join(", ")}\nRecent Conversation History:\n${messagesText}\nAvailable Knowledge Base Content:\n${knowledgeSummary}\nBased on the child's age, interests, recent conversations, and available knowledge base, generate a detailed interaction plan.\nInteraction types can be: chat, song, story, game, lesson\nPlease return in JSON format with the following fields:\n- interactionType: interaction type\n- contentId: ID of knowledge base content that can be used (if any)\n- objectives: array of interaction objectives\n- strategy: interaction strategy description\nPlease ensure the JSON format is correct and does not include any additional text.`;
+		return `You are a professional children's companion assistant planner, 
+		and you need to create an interaction plan for 
+		${childProfile.name} (${childProfile.age} years old).\nChild Interests and 
+		Hobbies: ${childProfile.interests.join(", ")}\nRecent Conversation 
+		History:\n${messagesText}\nAvailable Knowledge Base 
+		Content:\n${knowledgeSummary}\nBased on the child's age, interests, 
+		recent conversations, and available knowledge base, generate a detailed 
+		interaction plan.\nInteraction types can be: chat, song, story, game, 
+		lesson\nPlease return in JSON format with the following fields:\n- 
+		interactionType: interaction type\n- contentId: ID of knowledge base 
+		content that can be used (if any)\n- objectives: array of interaction 
+		objectives\n- strategy: interaction strategy description\nPlease ensure the 
+		JSON format is correct and does not include any additional text.
+		
+		You need to gauge the child's emotional changes based on the conversation history.
+		You have one more crucial task: if you notice any negative feedback 
+		from the child—such as not understanding, refusing to speak, or similar situations—then your generated strategy 
+		must include the recommendation to “reduce the use of Chinese vocabulary.”
+		
+		All output must be in English.
+		`
+		;
 	}
 
 	// 总结知识库内容

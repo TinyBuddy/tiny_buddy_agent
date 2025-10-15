@@ -337,11 +337,11 @@ export class TinyBuddyApp {
 
 			// 检查是否需要创建或更新规划
 			// 1. 如果没有规划结果，或者
-			// 2. 上一次规划时间超过30秒
+			// 2. 上一次规划时间超过3秒
 			const shouldTriggerPlanning =
 				!planResult ||
 				(planResult.timestamp &&
-					Date.now() - planResult.timestamp.getTime() > 30000);
+					Date.now() - planResult.timestamp.getTime() > 3000);
 
 			if (shouldTriggerPlanning) {
 				// 如果没有已有规划或规划已过期，启动异步规划任务
