@@ -80,6 +80,8 @@ when child says "i like dog", dog is a english vocabulary word, maybe child want
 so you can do the insertion of Chinese vocabulary instruction.
 
 
+All above is merely a reference example. You need to think for yourself about how to respond.
+
 # Chinese Learning
 Each level represents a distinct stage of Chinese acquisition for an English-dominant child.
 The model should adjust vocabulary complexity, sentence structure, language ratio,
