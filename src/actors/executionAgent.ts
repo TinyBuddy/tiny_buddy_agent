@@ -1,4 +1,4 @@
-// import { deepseek } from "@ai-sdk/deepseek";
+import { deepseek } from "@ai-sdk/deepseek";
 import { openai } from "@ai-sdk/openai";
 import axios from 'axios';
 import { generateText, streamText } from "ai";
@@ -518,7 +518,7 @@ export class ExecutionAgent implements BaseActor {
 		if (onStreamChunk) {
 			const result = await streamText({
 				// model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
-				model: openai("gpt-5"),
+				model: openai("gpt-4.1"),
 				prompt,
 				maxOutputTokens: 300,
 				temperature: 0.7,
@@ -534,7 +534,7 @@ export class ExecutionAgent implements BaseActor {
 			// 否则使用普通的generateText
 			const result = await generateText({
 				// model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
-				model: openai("gpt-5"),
+				model: openai("gpt-4.1"),
 				prompt,
 				maxOutputTokens: 300,
 				temperature: 0.7,
