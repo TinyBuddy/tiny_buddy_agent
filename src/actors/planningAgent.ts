@@ -421,7 +421,7 @@ export class PlanningAgent implements BaseActor {
 							type: parsedJson.afternoonActivity?.type || "story",
 							content:
 								parsedJson.afternoonActivity?.content ||
-								"让我们一起读个故事吧！",
+								"我们一起读个故事吧！",
 						},
 						eveningActivity: {
 							type: parsedJson.eveningActivity?.type || "chat",
@@ -638,73 +638,123 @@ export class PlanningAgent implements BaseActor {
 			let jsonStr: string | null = null;
 
 			// 方式1: 查找标准JSON对象或数组
-			const jsonMatch = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-			if (jsonMatch?.[0]) {
-				jsonStr = jsonMatch[0];
+			try {
+				const jsonMatch = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+				if (jsonMatch?.[0]) {
+					jsonStr = jsonMatch[0];
+				}
+			} catch (e) {
+				console.error("正则表达式匹配失败:", e);
 			}
 
 			// 方式2: 如果方式1失败，尝试查找代码块中的JSON
 			if (!jsonStr) {
-				const codeBlockMatch = text.match(
-					/```(?:json)?\s*(\{[\s\S]*\}|\[[\s\S]*\])\s*```/,
-				);
-				if (codeBlockMatch?.[1]) {
-					jsonStr = codeBlockMatch[1];
+				try {
+					const codeBlockMatch = text.match(
+						/```(?:json)?\s*(\{[\s\S]*\}|\[[\s\S]*\])\s*```/,
+					);
+					if (codeBlockMatch?.[1]) {
+						jsonStr = codeBlockMatch[1];
+					}
+				} catch (e) {
+					console.error("代码块正则匹配失败:", e);
 				}
 			}
 
 			// 方式3: 如果仍然没有找到，尝试更宽松的匹配
 			if (!jsonStr) {
-				const looseMatch = text.match(/(\{[^}]*"interactionType"[^}]*\})/);
-				if (looseMatch?.[1]) {
-					jsonStr = looseMatch[1];
+				try {
+					const looseMatch = text.match(/(\{[^}]*"interactionType"[^}]*\})/);
+					if (looseMatch?.[1]) {
+						jsonStr = looseMatch[1];
+					}
+				} catch (e) {
+					console.error("宽松匹配失败:", e);
 				}
 			}
 
-			if (jsonStr) {
-				// 在清理之前先记录原始提取的JSON字符串
-				console.log("提取的原始JSON字符串:", jsonStr);
+			// 方式4: 如果返回以[开头但可能不完整，尝试构造有效的JSON
+			if (!jsonStr && text.trim().startsWith('[')) {
+				console.log("检测到以[开头的不完整响应，尝试构造有效的JSON");
+				// 构造一个包含基本结构的JSON
+				jsonStr = JSON.stringify([{
+					interactionType: "chat",
+					objectives: ["建立情感连接", "鼓励表达"],
+					strategy: `Chat with ${childProfile.name} as a friend`
+				}]);
+			}
 
-				// 清理JSON字符串，移除可能导致解析失败的字符
-				// 增强的JSON清理和修复机制
-				jsonStr = jsonStr
-					.replace(/\t/g, " ") // 替换制表符为空格
-					.replace(/,\s*\}/g, "}") // 移除末尾逗号
-					.replace(/,\s*\]/g, "]") // 移除数组末尾逗号
-					.replace(/\}\s*\{/g, "},{") // 修复缺少的逗号
-					.replace(/([^\\])"([^\\"])"([^\s:,}"])/g, "$1\"$2\" $3") // 确保字符串后有空格
-					.replace(/([^:\s"]+)\s*:/g, '"$1":') // 确保属性名有引号
-					.replace(/:\s*([^"\s\[\{][^,}\]]*)/g, ': "$1"') // 为非引用值添加引号
-					.replace(/""([^"]+)""/g, '"$1"') // 修复重复引号
-					.replace(/\\n/g, "\\\\n") // 转义换行符
-					.trim();
+			// 如果仍然没有有效的JSON，使用默认结构
+			if (!jsonStr) {
+				console.warn("无法提取有效的JSON，使用默认规划结构");
+				jsonStr = JSON.stringify({
+					interactionType: "chat",
+					objectives: ["建立情感连接", "鼓励表达"],
+					strategy: `Chat with ${childProfile.name} as a friend`
+				});
+			}
 
-				console.log("清理后的JSON字符串:", jsonStr); // 用于调试
+			// 在清理之前先记录原始提取的JSON字符串
+			console.log("提取的原始JSON字符串:", jsonStr);
 
-				// 尝试解析JSON，如果失败则使用更多修复措施
-				let parsedJson: any;
+			// 清理JSON字符串，移除可能导致解析失败的字符
+			// 增强的JSON清理和修复机制
+			jsonStr = jsonStr
+				.replace(/\t/g, " ") // 替换制表符为空格
+				.replace(/,\s*\}/g, "}") // 移除末尾逗号
+				.replace(/,\s*\]/g, "]") // 移除数组末尾逗号
+				.replace(/\}\s*\{/g, "},{") // 修复缺少的逗号
+				.replace(/([^\\])"([^\\"])"([^\s:,}"])/g, "$1\"$2\" $3") // 确保字符串后有空格
+				.replace(/([^:\s"]+)\s*:/g, '"$1":') // 确保属性名有引号
+				.replace(/:\s*([^"\s\[\{][^,}\]]*)/g, ': "$1"') // 为非引用值添加引号
+				.replace(/""([^"]+)""/g, '"$1"') // 修复重复引号
+				.replace(/\\n/g, "\\\\n") // 转义换行符
+				.trim();
+
+			console.log("清理后的JSON字符串:", jsonStr); // 用于调试
+
+			// 尝试解析JSON，如果失败则使用更多修复措施
+			let parsedJson: any = null;
+			let parsingAttempts = 0;
+			const maxAttempts = 3;
+
+			while (!parsedJson && parsingAttempts < maxAttempts) {
+				parsingAttempts++;
 				try {
-					parsedJson = JSON.parse(jsonStr);
+					if (parsingAttempts === 1) {
+						// 第一次尝试直接解析
+						parsedJson = JSON.parse(jsonStr);
+					} else if (parsingAttempts === 2) {
+						// 第二次尝试：更激进的修复
+						console.log("第一次解析失败，尝试更激进的修复措施");
+						const moreFixedJsonStr = jsonStr
+							.replace(/[^\x20-\x7E\u4e00-\u9fa5\{\}\[\]\:",]/g, '') // 仅保留基本JSON字符和中文
+							.replace(/\s+/g, ' ') // 合并多余空格
+							.replace(/([{,])\s*"([^"]*)":\s*"([^"]*?)"\s*/g, '$1 "$2":"$3"'); // 标准化格式
+						console.log(`第${parsingAttempts}次修复后的JSON:`, moreFixedJsonStr);
+						parsedJson = JSON.parse(moreFixedJsonStr);
+					} else {
+						// 第三次尝试：使用非常保守的方法，直接返回默认结构
+						console.log("第二次解析失败，使用保守默认结构");
+						return this.createFallbackPlan(context);
+					}
 				} catch (parseError) {
-					console.error("第一次解析失败，尝试更激进的修复措施");
-					// 尝试移除可能导致问题的字符
-					const moreFixedJsonStr = jsonStr
-						.replace(/[^\x20-\x7E\u4e00-\u9fa5]+/g, '') // 移除非ASCII和非中文字符
-						.replace(/\s+/g, ' ') // 合并多余空格
-						.replace(/([{,])\s*"([^"]*)":\s*"([^"]*?)"\s*/g, '$1 "$2":"$3"'); // 标准化格式
-					console.log("更激进修复后的JSON:", moreFixedJsonStr);
-					parsedJson = JSON.parse(moreFixedJsonStr);
+					console.error(`第${parsingAttempts}次解析失败:`, parseError);
+					// 继续下一次尝试
 				}
+			}
 
-				// 如果解析结果是数组，取第一个元素
-				if (Array.isArray(parsedJson)) {
-					console.log("检测到数组响应，使用第一个元素作为规划");
-					llmPlan = parsedJson[0];
-				} else {
-					llmPlan = parsedJson;
-				}
+			// 确保parsedJson不为null
+			if (!parsedJson) {
+				throw new Error("所有解析尝试都失败了");
+			}
+
+			// 如果解析结果是数组，取第一个元素
+			if (Array.isArray(parsedJson)) {
+				console.log("检测到数组响应，使用第一个元素作为规划");
+				llmPlan = parsedJson[0] || { interactionType: "chat" };
 			} else {
-				throw new Error("无法从LLM响应中提取有效的JSON");
+				llmPlan = parsedJson;
 			}
 		} catch (error) {
 			console.error("解析大模型响应失败:", error);
