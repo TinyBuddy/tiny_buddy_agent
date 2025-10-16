@@ -368,7 +368,7 @@ export class PlanningAgent implements BaseActor {
 				// model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
 				model: openai("gpt-4.1"),
 				prompt,
-				maxOutputTokens: 800,
+				maxOutputTokens: 1200,
 				temperature: 0.7,
 			});
 
