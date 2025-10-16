@@ -716,7 +716,7 @@ export class PlanningAgent implements BaseActor {
 			// 尝试解析JSON，如果失败则使用更多修复措施
 			let parsedJson: any = null;
 			let parsingAttempts = 0;
-			const maxAttempts = 3;
+			const maxAttempts = 4;
 
 			while (!parsedJson && parsingAttempts < maxAttempts) {
 				parsingAttempts++;
@@ -733,9 +733,37 @@ export class PlanningAgent implements BaseActor {
 							.replace(/([{,])\s*"([^"]*)":\s*"([^"]*?)"\s*/g, '$1 "$2":"$3"'); // 标准化格式
 						console.log(`第${parsingAttempts}次修复后的JSON:`, moreFixedJsonStr);
 						parsedJson = JSON.parse(moreFixedJsonStr);
+					} else if (parsingAttempts === 3) {
+						// 第三次尝试：检测并修复不完整的JSON数组
+						console.log("第二次解析失败，尝试修复不完整的JSON数组");
+						let fixedArrayJsonStr = jsonStr;
+						// 检查是否是数组且可能不完整
+						if (jsonStr.trim().startsWith('[') && !jsonStr.trim().endsWith(']')) {
+							// 尝试找出最后一个完整的对象并关闭数组
+							const lastObjectEndIndex = jsonStr.lastIndexOf('}');
+							if (lastObjectEndIndex !== -1) {
+								fixedArrayJsonStr = jsonStr.substring(0, lastObjectEndIndex + 1) + ']';
+							} else {
+								// 如果找不到完整对象，创建一个基本的数组结构
+								fixedArrayJsonStr = '[{"interactionType":"chat","objectives":["建立情感连接"],"strategy":"Basic chat interaction"}]';
+							}
+						} else if (jsonStr.includes('"objectives":') && jsonStr.includes(']')) {
+							// 处理可能缺少strategy的对象
+							if (!jsonStr.includes('"strategy":')) {
+								// 在objectives数组后面添加strategy字段
+								const objectivesEndIndex = jsonStr.lastIndexOf(']');
+								if (objectivesEndIndex !== -1) {
+									const restOfString = jsonStr.substring(objectivesEndIndex + 1);
+									fixedArrayJsonStr = jsonStr.substring(0, objectivesEndIndex + 1) + 
+										',"strategy":"Default strategy"' + restOfString;
+								}
+							}
+						}
+						console.log(`第${parsingAttempts}次修复后的JSON:`, fixedArrayJsonStr);
+						parsedJson = JSON.parse(fixedArrayJsonStr);
 					} else {
-						// 第三次尝试：使用非常保守的方法，直接返回默认结构
-						console.log("第二次解析失败，使用保守默认结构");
+						// 第四次尝试：使用最简单的默认结构
+						console.log("第三次解析失败，使用最简单的默认结构");
 						return this.createFallbackPlan(context);
 					}
 				} catch (parseError) {
@@ -746,15 +774,32 @@ export class PlanningAgent implements BaseActor {
 
 			// 确保parsedJson不为null
 			if (!parsedJson) {
-				throw new Error("所有解析尝试都失败了");
+				console.error("所有解析尝试都失败了");
+				return this.createFallbackPlan(context);
 			}
 
 			// 如果解析结果是数组，取第一个元素
 			if (Array.isArray(parsedJson)) {
 				console.log("检测到数组响应，使用第一个元素作为规划");
-				llmPlan = parsedJson[0] || { interactionType: "chat" };
+				// 确保数组不为空且第一个元素有效
+				if (parsedJson.length > 0 && parsedJson[0]) {
+					llmPlan = parsedJson[0];
+				} else {
+					llmPlan = { interactionType: "chat" };
+				}
 			} else {
 				llmPlan = parsedJson;
+			}
+
+			// 确保llmPlan具有必要的字段
+			if (!llmPlan.interactionType) {
+				llmPlan.interactionType = "chat";
+			}
+			if (!llmPlan.objectives) {
+				llmPlan.objectives = ["建立情感连接", "鼓励表达"];
+			}
+			if (!llmPlan.strategy) {
+				llmPlan.strategy = `Chat with ${childProfile.name || 'the child'} as a friend`;
 			}
 		} catch (error) {
 			console.error("解析大模型响应失败:", error);
