@@ -734,29 +734,97 @@ export class PlanningAgent implements BaseActor {
 						console.log(`第${parsingAttempts}次修复后的JSON:`, moreFixedJsonStr);
 						parsedJson = JSON.parse(moreFixedJsonStr);
 					} else if (parsingAttempts === 3) {
-						// 第三次尝试：检测并修复不完整的JSON数组
-						console.log("第二次解析失败，尝试修复不完整的JSON数组");
+						// 第三次尝试：检测并修复不完整的JSON数组和对象
+						console.log("第二次解析失败，尝试修复不完整的JSON数组和对象");
 						let fixedArrayJsonStr = jsonStr;
-						// 检查是否是数组且可能不完整
-						if (jsonStr.trim().startsWith('[') && !jsonStr.trim().endsWith(']')) {
-							// 尝试找出最后一个完整的对象并关闭数组
-							const lastObjectEndIndex = jsonStr.lastIndexOf('}');
-							if (lastObjectEndIndex !== -1) {
-								fixedArrayJsonStr = jsonStr.substring(0, lastObjectEndIndex + 1) + ']';
+						
+						// 处理数组情况
+						if (jsonStr.trim().startsWith('[')) {
+							// 检查并修复每个对象中的缺失字段
+							// 1. 先确保所有对象都有strategy字段
+							let tempJson = jsonStr;
+							let braceCount = 0;
+							let currentObject = '';
+							let lastObjectStart = 0;
+							let objects = [];
+							let inQuotes = false;
+							let escapeNext = false;
+								
+							for (let i = 0; i < tempJson.length; i++) {
+								const char = tempJson[i];
+								
+								if (escapeNext) {
+									escapeNext = false;
+								} else if (char === '\\') {
+									escapeNext = true;
+								} else if (char === '"') {
+									inQuotes = !inQuotes;
+								} else if (!inQuotes) {
+									if (char === '{') {
+										braceCount++;
+										if (braceCount === 1) {
+											lastObjectStart = i;
+										}
+									} else if (char === '}') {
+										braceCount--;
+										if (braceCount === 0) {
+											currentObject = tempJson.substring(lastObjectStart, i + 1);
+											objects.push(currentObject);
+											currentObject = '';
+										}
+									} else if (char === ',' && braceCount === 0) {
+										// 处理数组中的逗号
+										continue;
+									}
+								}
+							}
+								
+							// 处理最后一个可能不完整的对象
+							if (braceCount > 0 && lastObjectStart > 0) {
+								let incompleteObject = tempJson.substring(lastObjectStart);
+								// 检查是否有objectives数组
+								if (incompleteObject.includes('"objectives":') && incompleteObject.includes(']')) {
+									// 确保objectives数组闭合
+									if (!incompleteObject.includes(']')) {
+										incompleteObject = incompleteObject + ']';
+									}
+									// 添加strategy字段
+									if (!incompleteObject.includes('"strategy":')) {
+										const objectivesEndIndex = incompleteObject.lastIndexOf(']');
+										if (objectivesEndIndex !== -1) {
+											incompleteObject = incompleteObject.substring(0, objectivesEndIndex + 1) + 
+												',"strategy":"Default strategy"';
+										}
+									}
+									// 闭合对象
+									incompleteObject = incompleteObject + '}';
+								} else {
+									// 如果不完整且结构混乱，使用默认对象
+									incompleteObject = '{"interactionType":"chat","objectives":["Default objective"],"strategy":"Default strategy"}';
+								}
+								objects.push(incompleteObject);
+							}
+								
+							// 重建JSON数组
+							if (objects.length > 0) {
+								fixedArrayJsonStr = '[' + objects.join(',') + ']';
 							} else {
-								// 如果找不到完整对象，创建一个基本的数组结构
-								fixedArrayJsonStr = '[{"interactionType":"chat","objectives":["建立情感连接"],"strategy":"Basic chat interaction"}]';
+								// 兜底方案
+								fixedArrayJsonStr = '[{"interactionType":"chat","objectives":["Default objective"],"strategy":"Default strategy"}]';
 							}
 						} else if (jsonStr.includes('"objectives":') && jsonStr.includes(']')) {
-							// 处理可能缺少strategy的对象
+							// 处理单个对象缺少strategy的情况
 							if (!jsonStr.includes('"strategy":')) {
-								// 在objectives数组后面添加strategy字段
 								const objectivesEndIndex = jsonStr.lastIndexOf(']');
 								if (objectivesEndIndex !== -1) {
 									const restOfString = jsonStr.substring(objectivesEndIndex + 1);
 									fixedArrayJsonStr = jsonStr.substring(0, objectivesEndIndex + 1) + 
 										',"strategy":"Default strategy"' + restOfString;
 								}
+							}
+							// 确保对象闭合
+							if (!fixedArrayJsonStr.endsWith('}')) {
+								fixedArrayJsonStr = fixedArrayJsonStr + '}';
 							}
 						}
 						console.log(`第${parsingAttempts}次修复后的JSON:`, fixedArrayJsonStr);
