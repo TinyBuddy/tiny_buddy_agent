@@ -698,7 +698,7 @@ export class PlanningAgent implements BaseActor {
 
 			// 在清理之前先记录原始提取的JSON字符串
 			// 提取JSON部分（假设是数组格式）
-			let jsonStr = result.text;
+			jsonStr = result.text; // 改为赋值，避免重复声明
 			// 尝试提取JSON数组部分
 			const jsonStart = jsonStr.indexOf('[');
 			const jsonEnd = jsonStr.lastIndexOf(']');
