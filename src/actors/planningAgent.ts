@@ -604,10 +604,10 @@ export class PlanningAgent implements BaseActor {
 		context: ActorContext,
 	): Promise<PlanningResult> {
 		const { childProfile, conversationHistory, knowledgeBase } = context;
-		const recentMessages = this.getRecentMessages(conversationHistory, 10);
+		const recentMessages = this.getRecentMessages(conversationHistory, 5);
 		const knowledgeSummary = this.summarizeKnowledgeBase(knowledgeBase);
 
-		console.log("规划agent 调用最近10条消息:", recentMessages);
+		console.log("规划agent 调用最近5条消息:", recentMessages);
 
 		// 构建规划提示词
 		const prompt = this.buildPlanningPrompt(
@@ -666,17 +666,35 @@ export class PlanningAgent implements BaseActor {
 				console.log("提取的原始JSON字符串:", jsonStr);
 
 				// 清理JSON字符串，移除可能导致解析失败的字符
-				// 但要更小心地处理，避免破坏有效的JSON结构
+				// 增强的JSON清理和修复机制
 				jsonStr = jsonStr
+					.replace(/\t/g, " ") // 替换制表符为空格
+					.replace(/,\s*\}/g, "}") // 移除末尾逗号
+					.replace(/,\s*\]/g, "]") // 移除数组末尾逗号
+					.replace(/\}\s*\{/g, "},{") // 修复缺少的逗号
+					.replace(/([^\\])"([^\\"])"([^\s:,}"])/g, "$1\"$2\" $3") // 确保字符串后有空格
+					.replace(/([^:\s"]+)\s*:/g, '"$1":') // 确保属性名有引号
+					.replace(/:\s*([^"\s\[\{][^,}\]]*)/g, ': "$1"') // 为非引用值添加引号
+					.replace(/""([^"]+)""/g, '"$1"') // 修复重复引号
 					.replace(/\\n/g, "\\\\n") // 转义换行符
-					.replace(/\\t/g, "\\\\t") // 转义制表符
-					.replace(/\\\\n\s*\\\\n/g, "\\\\n") // 合并多个换行符
 					.trim();
 
 				console.log("清理后的JSON字符串:", jsonStr); // 用于调试
 
-				// 尝试解析JSON
-				const parsedJson = JSON.parse(jsonStr);
+				// 尝试解析JSON，如果失败则使用更多修复措施
+				let parsedJson: any;
+				try {
+					parsedJson = JSON.parse(jsonStr);
+				} catch (parseError) {
+					console.error("第一次解析失败，尝试更激进的修复措施");
+					// 尝试移除可能导致问题的字符
+					const moreFixedJsonStr = jsonStr
+						.replace(/[^\x20-\x7E\u4e00-\u9fa5]+/g, '') // 移除非ASCII和非中文字符
+						.replace(/\s+/g, ' ') // 合并多余空格
+						.replace(/([{,])\s*"([^"]*)":\s*"([^"]*?)"\s*/g, '$1 "$2":"$3"'); // 标准化格式
+					console.log("更激进修复后的JSON:", moreFixedJsonStr);
+					parsedJson = JSON.parse(moreFixedJsonStr);
+				}
 
 				// 如果解析结果是数组，取第一个元素
 				if (Array.isArray(parsedJson)) {
@@ -725,10 +743,9 @@ export class PlanningAgent implements BaseActor {
 
 		return `You are a professional children's companion assistant planner, 
 		and you need to create an interaction plan for 
-		 (${childProfile.age} years old child).\nChild Interests and 
+		${childProfile.age} years old child.\nChild Interests and 
 		Hobbies: ${childProfile.interests.join(", ")}\nRecent Conversation 
-		History:\n${messagesText}\nAvailable Knowledge Base 
-		Content:\n${knowledgeSummary}\nBased on the child's age, interests, 
+		History:\n${messagesText}\nBased on the child's age, interests, 
 		recent conversations, and available knowledge base, generate a detailed 
 		interaction plan.\nInteraction types can be: chat, song, story, game, 
 		lesson\nPlease return in JSON format with the following fields:\n- 
