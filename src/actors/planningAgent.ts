@@ -456,7 +456,9 @@ export class PlanningAgent implements BaseActor {
 		ageLevel: AgeLevel,
 		date: string,
 	): string {
-		return `You are a professional children's education planner, and you need to create a daily companionship plan for ${childProfile.name} (${childProfile.age} years old).\nChild Age Level: ${ageLevel.level}\nChild Characteristics: ${ageLevel.characteristics.join(", ")}\nRecommended Activities: ${ageLevel.recommendedActivities.join(", ")}\nChild Interests: ${childProfile.interests.join(", ")}\nBased on the above information, generate a detailed daily companionship plan including morning, afternoon, and evening sessions.\nEach session should include:\n- type: activity type (chat, song, story, game, lesson)\n- content: specific activity content\n\nThe plan should consider:\n1. Suitable for the cognitive development level of a ${childProfile.age}-year-old child\n2. Combining the child's interests and hobbies\n3. Including both educational and fun elements\n4. Various activity types in different sessions to avoid repetition\n\nPlease return in JSON format with the following fields:\n{\n  "morningActivity": {"type": "", "content": ""},\n  "afternoonActivity": {"type": "", "content": ""},\n  "eveningActivity": {"type": "", "content": ""},\n  "objectives": ["Objective 1", "Objective 2", "Objective 3"],\n  "notes": "Plan description"\n}\nPlease ensure the JSON format is correct and does not include any additional text.`;
+		return `You are a professional children's education planner, and you need to create a daily companionship plan for ${childProfile.name} (${childProfile.age} years old).\nChild Age Level: ${ageLevel.level}\nChild Characteristics: ${ageLevel.characteristics.join(", ")}\nRecommended Activities: ${ageLevel.recommendedActivities.join(", ")}\nChild Interests: ${childProfile.interests.join(", ")}\nBased on the above information, generate a detailed daily companionship plan including morning, afternoon, and evening sessions.\nEach session should include:\n- type: activity type (chat, song, story, game, lesson)\n- content: specific activity content\n\nThe plan should consider:\n1. Suitable for the cognitive development level of a ${childProfile.age}-year-old child\n2. Combining the child's interests and hobbies\n3. Including both educational and fun elements\n4. Various activity types in different sessions to avoid repetition\n\nPlease return in JSON format with the following fields:\n{\n  "morningActivity": {"type": "", "content": ""},\n  "afternoonActivity": {"type": "", "content": ""},\n  "eveningActivity": {"type": "", "content": ""},\n  "objectives": ["Objective 1", "Objective 2", "Objective 3"],\n  "notes": "Plan description"\n}\nPlease ensure the JSON format is correct and does not include any additional text.
+		`
+		;
 	}
 
 	// 获取儿童当天的计划
@@ -695,6 +697,15 @@ export class PlanningAgent implements BaseActor {
 			}
 
 			// 在清理之前先记录原始提取的JSON字符串
+			// 提取JSON部分（假设是数组格式）
+			let jsonStr = result.text;
+			// 尝试提取JSON数组部分
+			const jsonStart = jsonStr.indexOf('[');
+			const jsonEnd = jsonStr.lastIndexOf(']');
+			if (jsonStart !== -1 && jsonEnd > jsonStart) {
+				jsonStr = jsonStr.substring(jsonStart, jsonEnd + 1);
+			}
+
 			console.log("提取的原始JSON字符串:", jsonStr);
 
 			// 清理JSON字符串，移除可能导致解析失败的字符
@@ -703,14 +714,9 @@ export class PlanningAgent implements BaseActor {
 				.replace(/\t/g, " ") // 替换制表符为空格
 				.replace(/,\s*\}/g, "}") // 移除末尾逗号
 				.replace(/,\s*\]/g, "]") // 移除数组末尾逗号
-				.replace(/\}\s*\{/g, "},{") // 修复缺少的逗号
-				.replace(/([^\\])"([^\\"])"([^\s:,}"])/g, "$1\"$2\" $3") // 确保字符串后有空格
-				.replace(/([^:\s"]+)\s*:/g, '"$1":') // 确保属性名有引号
-				.replace(/:\s*([^"\s\[\{][^,}\]]*)/g, ': "$1"') // 为非引用值添加引号
-				.replace(/""([^"]+)""/g, '"$1"') // 修复重复引号
-				.replace(/\\n/g, "\\\\n") // 转义换行符
-				.trim();
+				.replace(/\}\s*{/g, "},{").trim(); // 修复缺少的逗号
 
+			// 不要过度清理，保留引号
 			console.log("清理后的JSON字符串:", jsonStr); // 用于调试
 
 			// 尝试解析JSON，如果失败则使用更多修复措施
@@ -730,7 +736,7 @@ export class PlanningAgent implements BaseActor {
 						const moreFixedJsonStr = jsonStr
 							.replace(/[^\x20-\x7E\u4e00-\u9fa5\{\}\[\]\:",]/g, '') // 仅保留基本JSON字符和中文
 							.replace(/\s+/g, ' ') // 合并多余空格
-							.replace(/([{,])\s*"([^"]*)":\s*"([^"]*?)"\s*/g, '$1 "$2":"$3"'); // 标准化格式
+							.trim();
 						console.log(`第${parsingAttempts}次修复后的JSON:`, moreFixedJsonStr);
 						parsedJson = JSON.parse(moreFixedJsonStr);
 					} else if (parsingAttempts === 3) {
@@ -740,18 +746,27 @@ export class PlanningAgent implements BaseActor {
 						
 						// 处理数组情况
 						if (jsonStr.trim().startsWith('[')) {
+							// 首先清理JSON字符串，移除可能的无效字符，但保留引号
+							let cleanJson = jsonStr
+								.replace(/[\s\n\r]+/g, ' ') // 标准化空白字符
+								.replace(/[^\x20-\x7E\u4e00-\u9fa5\{\}\[\]\:",]/g, '') // 仅保留基本字符
+								.trim();
+							
+							// 确保数组正确闭合
+							if (cleanJson.endsWith(']') === false) {
+								cleanJson = cleanJson + ']';
+							}
+							
 							// 检查并修复每个对象中的缺失字段
-							// 1. 先确保所有对象都有strategy字段
-							let tempJson = jsonStr;
 							let braceCount = 0;
 							let currentObject = '';
 							let lastObjectStart = 0;
-							let objects = [];
+							let objects: string[] = [];
 							let inQuotes = false;
 							let escapeNext = false;
 							 
-							for (let i = 0; i < tempJson.length; i++) {
-								const char = tempJson[i];
+							for (let i = 0; i < cleanJson.length; i++) {
+								const char = cleanJson[i];
 								
 								if (escapeNext) {
 									escapeNext = false;
@@ -764,139 +779,222 @@ export class PlanningAgent implements BaseActor {
 										braceCount++;
 										if (braceCount === 1) {
 											lastObjectStart = i;
+											currentObject = '{';
+										} else {
+											currentObject += char;
 										}
 									} else if (char === '}') {
+										currentObject += char;
 										braceCount--;
 										if (braceCount === 0) {
-											currentObject = tempJson.substring(lastObjectStart, i + 1);
+											// 处理当前完整对象
 											objects.push(currentObject);
 											currentObject = '';
 										}
-									} else if (char === ',' && braceCount === 0) {
-										// 处理数组中的逗号
-										continue;
+									} else if (braceCount > 0) {
+										// 收集对象内容
+										currentObject += char;
 									}
+								} else {
+									// 在引号内，直接添加字符
+									currentObject += char;
 								}
 							}
 							 
 							// 处理最后一个可能不完整的对象
-							if ((braceCount > 0 && lastObjectStart > 0) || (lastObjectStart > 0 && braceCount === 0 && !objects.some(obj => obj.includes(tempJson.substring(lastObjectStart, lastObjectStart + 20))))) {
-								let incompleteObject = tempJson.substring(lastObjectStart);
+							if (braceCount > 0 && lastObjectStart > 0) {
+								let incompleteObject = cleanJson.substring(lastObjectStart);
 								
-								// 处理可能未闭合的objectives数组
-								if (incompleteObject.includes('"objectives":') && !incompleteObject.includes(']')) {
-									// 查找最后一个'['的位置，尝试闭合数组
-									const lastOpenBracketIndex = incompleteObject.lastIndexOf('[');
-									if (lastOpenBracketIndex !== -1) {
-										// 尝试找到数组内容的结尾
-										let contentEndIndex = lastOpenBracketIndex;
-										let nestedBracketCount = 1;
-										let objInQuotes = false;
+								// 确保objectives数组正确闭合 - 增强版
+								if (incompleteObject.includes('"objectives":')) {
+									const objStart = incompleteObject.indexOf('"objectives":');
+									let arrayStart = incompleteObject.indexOf('[', objStart);
+									if (arrayStart !== -1) {
+										// 计算嵌套数组的括号平衡
+										let nestedCount = 1;
+										let endIndex = arrayStart + 1;
+										let inObjQuotes = false;
 										let objEscapeNext = false;
 										
-										for (let j = lastOpenBracketIndex + 1; j < incompleteObject.length; j++) {
-											const objChar = incompleteObject[j];
-											
+										while (endIndex < incompleteObject.length && nestedCount > 0) {
+											const c = incompleteObject[endIndex];
 											if (objEscapeNext) {
 												objEscapeNext = false;
-											} else if (objChar === '\\') {
+											} else if (c === '\\') {
 												objEscapeNext = true;
-											} else if (objChar === '"') {
-												objInQuotes = !objInQuotes;
-											} else if (!objInQuotes) {
-												if (objChar === '[') {
-													nestedBracketCount++;
-												} else if (objChar === ']') {
-													nestedBracketCount--;
-													if (nestedBracketCount === 0) {
-														contentEndIndex = j;
-														break;
-													}
-												}
+											} else if (c === '"') {
+												inObjQuotes = !inObjQuotes;
+											} else if (!inObjQuotes) {
+												if (c === '[') nestedCount++;
+												else if (c === ']') nestedCount--;
 											}
+											endIndex++;
 										}
 										
-										// 如果没有找到正确闭合的位置，添加']'在看起来合理的位置
-										if (nestedBracketCount > 0) {
-											// 尝试在逗号或其他合适的位置之后添加']'
-											let bestClosingPosition = incompleteObject.lastIndexOf(',');
-											if (bestClosingPosition === -1 || bestClosingPosition < lastOpenBracketIndex) {
-												bestClosingPosition = incompleteObject.lastIndexOf('"');
+										// 如果数组未闭合，强制闭合
+										if (nestedCount > 0) {
+											// 提取objectives数组部分并闭合
+											const beforeArray = incompleteObject.substring(0, arrayStart);
+											const afterArray = incompleteObject.substring(arrayStart);
+											// 尝试找到最后一个有效的objective元素
+											const lastQuoteIndex = afterArray.lastIndexOf('"');
+											if (lastQuoteIndex !== -1) {
+												// 确保在数组闭合前有逗号
+												let arrayContent = afterArray.substring(0, lastQuoteIndex + 1);
+												if (!arrayContent.endsWith(',')) {
+													arrayContent += ',';
+												}
+												// 闭合数组
+												arrayContent += ']';
+												// 重建对象
+												incompleteObject = beforeArray + arrayContent;
+											} else {
+												// 无法修复，使用默认objectives
+												incompleteObject = beforeArray + '["Default objective"]';
 											}
-											if (bestClosingPosition === -1 || bestClosingPosition < lastOpenBracketIndex) {
-												bestClosingPosition = incompleteObject.length;
+										}
+									}
+								}
+								
+								// 增强的strategy字段添加逻辑 - 确保在正确位置添加
+								if (!incompleteObject.includes('"strategy":')) {
+									// 检查是否包含objectives数组
+									if (incompleteObject.includes('"objectives":')) {
+										// 在objectives数组结束后添加strategy
+										const objectivesEnd = incompleteObject.lastIndexOf(']');
+										if (objectivesEnd !== -1) {
+											// 检查是否需要添加逗号
+											let insertStr = ",\"strategy\":\"Default strategy for this interaction\"";
+											incompleteObject = incompleteObject.substring(0, objectivesEnd + 1) + 
+											                 insertStr + 
+											                 incompleteObject.substring(objectivesEnd + 1);
+										} else {
+											// 在对象末尾添加
+											incompleteObject = incompleteObject.trim();
+											if (incompleteObject.endsWith('}')) {
+												incompleteObject = incompleteObject.slice(0, -1) + ",\"strategy\":\"Default strategy\"}";
+											} else {
+												incompleteObject += ",\"strategy\":\"Default strategy\"";
 											}
-											incompleteObject = incompleteObject.substring(0, bestClosingPosition + 1) + ']';
 										}
 									} else {
-										// 如果没有找到'['，添加基本的objectives数组
-										incompleteObject += '"objectives":["Default objective"]';
+										// 简单对象，直接添加
+										incompleteObject = incompleteObject.trim();
+										if (incompleteObject.endsWith('}')) {
+											incompleteObject = incompleteObject.slice(0, -1) + ",\"strategy\":\"Default strategy\"}";
+										} else {
+											incompleteObject += ",\"strategy\":\"Default strategy\"";
+										}
 									}
 								}
 								
-								// 添加strategy字段
-								if (!incompleteObject.includes('"strategy":')) {
-									// 尝试在objectives数组之后添加strategy
-									const objectivesEndIndex = incompleteObject.lastIndexOf(']');
-									if (objectivesEndIndex !== -1) {
-										incompleteObject = incompleteObject.substring(0, objectivesEndIndex + 1) + 
-											',"strategy":"Default strategy"';
-									} else {
-										// 如果找不到objectives数组，直接添加strategy
-										incompleteObject += '"strategy":"Default strategy"';
-									}
-								}
-								
-								// 闭合对象 - 确保有正确数量的大括号
-								const openBraceCount = (incompleteObject.match(/{/g) || []).length;
-								const closeBraceCount = (incompleteObject.match(/}/g) || []).length;
+								// 智能闭合对象 - 计算需要的大括号数量
+								const openBraceCount = (incompleteObject.match(/\{/g) || []).length;
+								const closeBraceCount = (incompleteObject.match(/\}/g) || []).length;
 								const missingBraces = openBraceCount - closeBraceCount;
 								
 								if (missingBraces > 0) {
 									incompleteObject = incompleteObject + '}'.repeat(missingBraces);
 								}
 								
-								// 清理可能的语法错误
-								incompleteObject = incompleteObject.replace(/,\s*}/g, '}');
-								incompleteObject = incompleteObject.replace(/}\s*{/g, '},{');
+								// 清理语法错误
+								incompleteObject = incompleteObject
+									.replace(/,\s*}/g, '}') // 移除尾部逗号
+									.replace(/\}\s*{/g, '},{'); // 修复对象间缺少逗号
 								
 								objects.push(incompleteObject);
 							}
 							 
 							// 重建JSON数组
 							if (objects.length > 0) {
+								// 确保对象间有逗号分隔
 								fixedArrayJsonStr = '[' + objects.join(',') + ']';
+								
+								// 最后检查数组是否闭合
+								if (!fixedArrayJsonStr.endsWith(']')) {
+									fixedArrayJsonStr = fixedArrayJsonStr + ']';
+								}
 							} else {
-								// 兜底方案
-								fixedArrayJsonStr = '[{"interactionType":"chat","objectives":["Default objective"],"strategy":"Default strategy"}]';
+								// 增强兜底方案 - 使用更完整的默认结构
+								fixedArrayJsonStr = '[{"interactionType":"chat","contentId":"default_001","objectives":["建立情感连接","鼓励表达"],"strategy":"Default fallback strategy"}]';
 							}
 						} else if (jsonStr.includes('"objectives":')) {
 							// 处理单个对象缺少strategy的情况
 							if (!jsonStr.includes('"strategy":')) {
+								// 在objectives数组后添加strategy
 								const objectivesEndIndex = jsonStr.lastIndexOf(']');
 								if (objectivesEndIndex !== -1) {
+									// 确保添加在正确位置
 									const restOfString = jsonStr.substring(objectivesEndIndex + 1);
 									fixedArrayJsonStr = jsonStr.substring(0, objectivesEndIndex + 1) + 
-										',"strategy":"Default strategy"' + restOfString;
+									                  ',"strategy":"Default strategy"' + restOfString;
 								} else {
-									// 如果找不到objectives数组结尾，添加基本字段
-									fixedArrayJsonStr += '"strategy":"Default strategy"';
+									// 直接在对象中添加
+									fixedArrayJsonStr = jsonStr.trim();
+									if (fixedArrayJsonStr.endsWith('}')) {
+										fixedArrayJsonStr = fixedArrayJsonStr.slice(0, -1) + ",\"strategy\":\"Default strategy\"}";
+									} else {
+										fixedArrayJsonStr += ",\"strategy\":\"Default strategy\"";
+									}
 								}
 							}
 							// 确保对象闭合
-							if (!fixedArrayJsonStr.endsWith('}')) {
-								fixedArrayJsonStr = fixedArrayJsonStr + '}';
+							const openBraceCount = (fixedArrayJsonStr.match(/\{/g) || []).length;
+							const closeBraceCount = (fixedArrayJsonStr.match(/\}/g) || []).length;
+							const missingBraces = openBraceCount - closeBraceCount;
+							
+							if (missingBraces > 0) {
+								fixedArrayJsonStr = fixedArrayJsonStr + '}'.repeat(missingBraces);
 							}
 						} else {
-							// 如果JSON结构完全混乱，使用兜底方案
-							fixedArrayJsonStr = '[{"interactionType":"chat","objectives":["Default objective"],"strategy":"Default strategy"}]';
+							// 如果JSON结构完全混乱，使用增强的兜底方案
+							fixedArrayJsonStr = '[{"interactionType":"chat","contentId":"fallback_001","objectives":["建立情感连接","鼓励表达"],"strategy":"Default fallback strategy when JSON is completely invalid"}]';
 						}
 						console.log(`第${parsingAttempts}次修复后的JSON:`, fixedArrayJsonStr);
 						parsedJson = JSON.parse(fixedArrayJsonStr);
 					} else {
-						// 第四次尝试：使用最简单的默认结构
-						console.log("第三次解析失败，使用最简单的默认结构");
-						return this.createFallbackPlan(context);
+						// 第四次尝试：更激进的修复 - 手动构建包含所有必要字段的JSON
+						console.log("第三次解析失败，尝试手动构建有效的JSON对象");
+						// 从原始文本中提取可能有用的信息
+						let interactionType = "chat";
+						let objectives: string[] = ["建立情感连接", "鼓励表达"];
+						let contentId = "fallback_001";
+						let strategy = "Default emergency fallback strategy";
+						
+						// 尝试从原始文本中提取互动类型
+						const typeRegex = /"interactionType"\s*:\s*"([^"]*)"/i;
+						const typeMatch = jsonStr.match(typeRegex);
+						if (typeMatch) {
+							interactionType = typeMatch[1];
+						}
+						
+						// 尝试从原始文本中提取contentId
+						const idRegex = /"contentId"\s*:\s*"([^"]*)"/i;
+						const idMatch = jsonStr.match(idRegex);
+						if (idMatch) {
+							contentId = idMatch[1];
+						}
+						
+						// 尝试从原始文本中提取objectives（简单提取）
+						const objRegex = /"objectives"\s*:\s*\[([^\]]*)\]/i;
+						const objMatch = jsonStr.match(objRegex);
+						if (objMatch) {
+							const objContent = objMatch[1];
+							const objItems = objContent.match(/"([^"]*)"/g) || [];
+							if (objItems.length > 0) {
+								objectives = objItems.map(item => item.replace(/"/g, ''));
+							}
+						}
+						
+						// 构建完整的JSON字符串
+						const emergencyJson = JSON.stringify([{
+							interactionType,
+							contentId,
+							objectives,
+							strategy
+						}]);
+						console.log("第四次修复后的JSON:", emergencyJson);
+						parsedJson = JSON.parse(emergencyJson);
 					}
 				} catch (parseError) {
 					console.error(`第${parsingAttempts}次解析失败:`, parseError);
@@ -923,14 +1021,14 @@ export class PlanningAgent implements BaseActor {
 				llmPlan = parsedJson;
 			}
 
-			// 确保llmPlan具有必要的字段
-			if (!llmPlan.interactionType) {
+			// 确保llmPlan具有必要的字段 - 增强验证
+			if (!llmPlan.interactionType || typeof llmPlan.interactionType !== 'string') {
 				llmPlan.interactionType = "chat";
 			}
-			if (!llmPlan.objectives) {
+			if (!llmPlan.objectives || !Array.isArray(llmPlan.objectives) || llmPlan.objectives.length === 0) {
 				llmPlan.objectives = ["建立情感连接", "鼓励表达"];
 			}
-			if (!llmPlan.strategy) {
+			if (!llmPlan.strategy || typeof llmPlan.strategy !== 'string') {
 				llmPlan.strategy = `Chat with ${childProfile.name || 'the child'} as a friend`;
 			}
 		} catch (error) {
