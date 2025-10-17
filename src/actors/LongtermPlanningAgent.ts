@@ -56,7 +56,7 @@ export class LongtermPlanningAgent implements BaseActor {
 	private vocabularyStore: ChineseVocabularyStore = {
 		vocabularyMap: new Map(),
 	};
-	private checkIntervalMinutes = 60; // 每分钟执行一次
+	private checkIntervalMinutes = 600; // 每分钟执行一次
 	private dbInitialized = false;
 
 	constructor(config: {
@@ -150,8 +150,9 @@ export class LongtermPlanningAgent implements BaseActor {
 			`长期规划Agent已启动，每${this.checkIntervalMinutes}分钟执行一次`,
 		);
 
-		// 立即执行一次，不需要等待第一分钟
-		await this.processAllUsers();
+		// 立即执行一次，不需要等待第一分钟 
+		// 注释掉  后面有用再打开
+		//await this.processAllUsers();
 	}
 
 	// 处理所有用户的逻辑
