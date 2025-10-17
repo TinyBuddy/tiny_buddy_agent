@@ -79,25 +79,25 @@ export class ExecutionAgent implements BaseActor {
 	}): Promise<{ output: string; metadata?: Record<string, unknown> }> {
 		console.log("executionAgent process input :", input);
 
-		// // 获取相关知识（统一处理，无论是否有计划）
-		// let relevantKnowledge = input.relevantKnowledge;
-		// if (!relevantKnowledge && !DEVELOPMENT_MODE) {
-		// 	try {
-		// 		// 调用知识库API获取相关知识
-		// 		const knowledgeResponse = await this.fetchKnowledgeFromRemoteApi(input.input);
-		// 		// 正确检查是否有匹配的知识内容
-		// 		if (knowledgeResponse && knowledgeResponse.hasMatch && knowledgeResponse.content && knowledgeResponse.content.trim().length > 0) {
-		// 			console.log(`成功获取知识库内容，长度: ${knowledgeResponse.content.length} 字符`);
-		// 			relevantKnowledge = {
-		// 				content: knowledgeResponse.content
-		// 			};
-		// 		} else if (knowledgeResponse) {
-		// 			console.log('知识库返回无匹配结果或内容为空');
-		// 		}
-		// 	} catch (error) {
-		// 		console.warn('知识库API调用失败:', error);
-		// 	}
-		// }
+		// 获取相关知识（统一处理，无论是否有计划）
+		let relevantKnowledge = input.relevantKnowledge;
+		if (!relevantKnowledge && !DEVELOPMENT_MODE) {
+			try {
+				// 调用知识库API获取相关知识
+				const knowledgeResponse = await this.fetchKnowledgeFromRemoteApi(input.input);
+				// 正确检查是否有匹配的知识内容
+				if (knowledgeResponse && knowledgeResponse.hasMatch && knowledgeResponse.content && knowledgeResponse.content.trim().length > 0) {
+					console.log(`成功获取知识库内容，长度: ${knowledgeResponse.content.length} 字符`);
+					relevantKnowledge = {
+						content: knowledgeResponse.content
+					};
+				} else if (knowledgeResponse) {
+					console.log('知识库返回无匹配结果或内容为空');
+				}
+			} catch (error) {
+				console.warn('知识库API调用失败:', error);
+			}
+		}
 
 		// 使用传入的计划
 		if (input.plan) {
