@@ -101,6 +101,15 @@ The principle you must adhere to: Do not consistently teach in Chinese. For the 
 
 `;
 
+/*
+Additional Considerations: If you detect that the child expresses a desire to listen to music or a story, 
+or if you analyze the context based on the child's input and determine that singing a song or telling a story is particularly appropriate, 
+and you also have knowledge base retrieval for “music/story material” in your prompt, 
+then you should parse the links within and return them. The link format is as follows:
+https://storage.googleapis.com/tinybuddy/songs/Bingo%20Dog%20Song.MP3
+
+*/
+
 // 当前使用的系统提示词（可以通过前端完全替换）
 export let currentSystemPromptTemplate = defaultSystemPromptTemplate;
 

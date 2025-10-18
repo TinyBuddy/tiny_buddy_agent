@@ -101,6 +101,7 @@ export class ExecutionAgent implements BaseActor {
 
 		// 使用传入的计划
 		if (input.plan) {
+			console.log("executionAgent process plan is :", input.plan);
 			this.currentPlan = input.plan;
 			this.state.currentInteractionType = 
 				input.plan.interactionType || input.plan.type;
@@ -141,7 +142,7 @@ export class ExecutionAgent implements BaseActor {
 					input.context.childProfile,
 					input.context.conversationHistory,
 					input.plan,
-					"",
+					relevantKnowledge,
 				);
 
 				console.log("executionAgent prompt :", prompt);
@@ -164,13 +165,23 @@ export class ExecutionAgent implements BaseActor {
 					learningPoint = `lesson_${Date.now()}`;
 				}
 
+				let music :string = ""
+				// 解析relevantKnowledge中的音乐链接
+				if (relevantKnowledge && typeof relevantKnowledge.content === 'string') {
+					const musicLinkMatch = relevantKnowledge.content.match(/https:\/\/storage\.googleapis\.com\/tinybuddy\/songs\/[^"'\s]+\.MP3/i);
+					if (musicLinkMatch && musicLinkMatch[0]) {
+						music = musicLinkMatch[0];
+					}
+				}
+
 				return {
 					output: response,
 					metadata: {
 						interactionType,
 						learningPoint,
 						progress,
-						prompt, // 添加提示词到metadata
+						prompt,
+						music,
 					},
 				};
 			} catch (error) {
@@ -305,7 +316,7 @@ export class ExecutionAgent implements BaseActor {
 				childProfile,
 				conversationHistory,
 				null, // 没有计划
-				""
+				
 			);
 
 			// 调用大模型生成响应
@@ -625,7 +636,7 @@ export class ExecutionAgent implements BaseActor {
 		// 添加相关知识库内容（如果有）
 		if (relevantKnowledge?.content) {
 			console.log("promt add relevantKnowledge:", relevantKnowledge);
-			systemPrompt += `\n\nHere's some relevant teaching material to reference in your response: ${JSON.stringify(relevantKnowledge.content)}\n`;
+			systemPrompt += `\n\nHere's some music/story material: ${JSON.stringify(relevantKnowledge.content)}\n`;
 		}
 
 		if (plan?.strategy) {

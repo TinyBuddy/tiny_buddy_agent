@@ -430,15 +430,29 @@ export class TinyBuddyApp {
 			// 执行Agent根据计划生成响应
 		console.log("调用执行Agent生成响应...");
 		console.log("传给excution agent的plan:", planOutput);
-		const executionResult = await executionAgent.process?.({
+		// 创建一个变量来存储音乐信息，以便在流式输出时使用
+		let musicInfo: string | undefined;
+		
+		const executionResult = await executionAgent.process?.({  
 			input: userMessage.content,
 			context,
 			plan: planOutput,
-			onStreamChunk: (chunk: string) => {
+			onStreamChunk: (chunk: string, metadata?: Record<string, unknown>) => {
 				// 直接传递执行Agent生成的字符级流式输出
-				onProgress(chunk, false, { type: 'stream_chunk' });
+					// 如果metadata中包含music信息，保存下来并传递
+					const streamMetadata: Record<string, unknown> = { type: 'stream_chunk' };
+					if (metadata && 'music' in metadata) {
+						musicInfo = String(metadata.music);
+						streamMetadata.music = musicInfo;
+					}
+					onProgress(chunk, false, streamMetadata);
 			},
 		});
+		
+		// 如果executionResult中有music信息但之前没有获取到，更新musicInfo
+				if (executionResult?.metadata && 'music' in executionResult.metadata && !musicInfo) {
+					musicInfo = String(executionResult.metadata.music);
+				}
 
 			if (!executionResult || !executionResult.output) {
 				throw new Error("执行Agent未返回有效的响应");
@@ -467,6 +481,8 @@ export class TinyBuddyApp {
 					interactionType: executionResult.metadata?.interactionType || "chat",
 					isFinalResponse: true,
 					plan: planOutput,
+					// 传递音乐链接信息
+					...(musicInfo && { music: musicInfo }),
 				},
 			});
 
@@ -492,7 +508,13 @@ export class TinyBuddyApp {
 			);
 
 			// 通知调用者有了最终响应
-			onProgress(executionResult.output, true);
+			// 构建完整的metadata，包括音乐信息和type标记
+					const finalMetadata: Record<string, unknown> = {};
+					if (musicInfo) {
+						finalMetadata.music = musicInfo;
+						finalMetadata.type = 'music';
+					}
+					onProgress(executionResult.output, true, finalMetadata);
 
 			return executionResult.output;
 		} catch (error) {

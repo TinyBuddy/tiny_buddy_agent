@@ -214,6 +214,17 @@ class WebSocketMessageHandler {
 								}),
 							);
 						}
+						
+						// 如果有音乐元数据，创建专门的音乐消息
+						if (metadata?.music) {
+							ws.send(
+								JSON.stringify({
+									type: "music",
+									url: metadata.music,
+									timestamp: new Date().toISOString(),
+								}),
+							);
+						}
 
 						// 根据metadata类型决定消息类型
 						const messageType = metadata?.type === 'stream_chunk' ? 'stream_chunk' : 

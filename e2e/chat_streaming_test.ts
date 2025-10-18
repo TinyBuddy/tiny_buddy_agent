@@ -2,9 +2,9 @@
 import { WebSocket } from 'ws';
 
 // 连接配置
-const SERVER_URL = 'ws://136.115.118.154:3143';
+const SERVER_URL = 'ws://localhost:3143';
 const CHILD_ID = 'e2e_test_streaming';
-const TEST_MESSAGE = '你好，TinyBuddy！我想测试一下你的流式输出功能。';
+const TEST_MESSAGE = '播放一首音乐，我想听Bingo Dog Song'; // 更明确的音乐请求
 
 // 记录开始时间和收到的流数据
 let startTime: number;
@@ -13,6 +13,8 @@ let actualChatResponse: string[] = []; // 仅包含实际的对话内容（字�
 let receivedFinalResponse: string = '';
 let isTestComplete = false;
 let streamChunkCount = 0;
+let receivedMusicType = false; // 记录是否收到type为music的响应
+let receivedMusicUrl = ''; // 记录收到的音乐链接
 
 console.log('=== 服务器聊天流式输出测试 ===');
 
@@ -75,6 +77,13 @@ ws.on('message', (data) => {
       actualChatResponse.push(chunk); // 仅将实际对话内容添加到专用数组
       streamChunkCount++;
       
+      // 检查metadata中是否包含type为music的信息
+      if (message.metadata && message.metadata.type === 'music') {
+        receivedMusicType = true;
+        receivedMusicUrl = message.metadata.music || '';
+        console.log('✅ 成功接收到music类型的响应，音乐链接:', receivedMusicUrl);
+      }
+      
       // 在终端中一个字符一个字符地打印
       process.stdout.write(chunk);
     }
@@ -84,11 +93,25 @@ ws.on('message', (data) => {
       const chunk = message.content || '';
       console.log(`收到流数据: "${chunk}"`);
       receivedStreamData.push(chunk);
+      
+      // 检查metadata中是否包含type为music的信息
+      if (message.metadata && message.metadata.type === 'music') {
+        receivedMusicType = true;
+        receivedMusicUrl = message.metadata.music || '';
+        console.log('✅ 成功接收到music类型的响应，音乐链接:', receivedMusicUrl);
+      }
     }
     
     // 处理最终响应
     if (message.type === 'final_response') {
       receivedFinalResponse = message.content || '';
+      
+      // 检查metadata中是否包含type为music的信息
+      if (message.metadata && message.metadata.type === 'music') {
+        receivedMusicType = true;
+        receivedMusicUrl = message.metadata.music || '';
+        console.log('✅ 成功接收到music类型的响应，音乐链接:', receivedMusicUrl);
+      }
       
       // 检查是否已经接收到流式数据
       if (receivedStreamData.length === 0) {
@@ -118,6 +141,13 @@ ws.on('message', (data) => {
         message.type !== 'progress' && 
         message.type !== 'final_response') {
       console.log(`收到其他类型消息: ${message.type}`);
+      
+      // 检查是否是music类型消息
+      if (message.type === 'music' && message.url) {
+        receivedMusicType = true;
+        receivedMusicUrl = message.url;
+        console.log('✅ 成功接收到music类型的响应，音乐链接:', receivedMusicUrl);
+      }
     }
     
   } catch (error) {
@@ -133,6 +163,14 @@ ws.on('close', (code, reason) => {
   const completeStreamResponse = receivedStreamData.join('');
   
   console.log('\n=== 测试结果 ===');
+  
+  // 检查音乐类型响应
+  if (receivedMusicType) {
+    console.log('✅ 音乐类型响应测试通过: 成功接收到type为music的响应');
+    console.log('音乐链接:', receivedMusicUrl);
+  } else {
+    console.log('❌ 音乐类型响应测试失败: 未收到type为music的响应');
+  }
   
   // 检查测试结果
   if (streamChunkCount > 0) {
