@@ -2,7 +2,7 @@
 import { WebSocket } from 'ws';
 
 // 连接配置
-const SERVER_URL = 'ws://localhost:3143';
+const SERVER_URL = 'ws://136.115.118.154:3143';
 const CHILD_ID = 'e2e_test_streaming';
 const TEST_MESSAGE = '播放一首音乐，我想听Bingo Dog Song'; // 更明确的音乐请求
 
