@@ -81,7 +81,13 @@ export class ExecutionAgent implements BaseActor {
 
 		// 获取相关知识（统一处理，无论是否有计划）
 		let relevantKnowledge = input.relevantKnowledge;
-		if (!relevantKnowledge && !DEVELOPMENT_MODE) {
+		// 检查输入是否包含与歌曲相关的关键词
+		const songKeywords = ["song", "music", "sing", "Nursery rhyme", "歌曲", "音乐", "儿歌", "歌谣"];
+		const containsSongKeyword = songKeywords.some(keyword => 
+			input.input.toLowerCase().includes(keyword.toLowerCase())
+		);
+		
+		if (!relevantKnowledge && !DEVELOPMENT_MODE && containsSongKeyword) {
 			try {
 				// 调用知识库API获取相关知识
 				const knowledgeResponse = await this.fetchKnowledgeFromRemoteApi(input.input);
