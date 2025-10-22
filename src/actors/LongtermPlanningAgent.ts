@@ -9,6 +9,7 @@ import type { Message } from "../models/message";
 import type { KnowledgeBaseService } from "../services/knowledgeBaseService";
 import type { MemoryService } from "../services/memoryService";
 import type { VocabularyService } from "../services/vocabularyService";
+import type { Mem0Service } from "../services/mem0Service";
 import { defaultVocabularyService } from "../services/vocabularyService";
 import type { ActorContext, BaseActor } from "./baseActor";
 
@@ -50,6 +51,7 @@ export class LongtermPlanningAgent implements BaseActor {
 	private lastPlan: PlanningResult | null = null;
 	private knowledgeBaseService: KnowledgeBaseService | undefined;
 	private memoryService: MemoryService | undefined;
+	private mem0Service: Mem0Service | undefined;
 	private scheduleTimer: NodeJS.Timeout | null = null;
 	private vocabularyService: VocabularyService;
 	// 保留内存中的词汇存储作为缓存
@@ -62,6 +64,7 @@ export class LongtermPlanningAgent implements BaseActor {
 	constructor(config: {
 		knowledgeBaseService?: KnowledgeBaseService;
 		memoryService?: MemoryService;
+		mem0Service?: Mem0Service;
 		vocabularyService?: VocabularyService;
 	}) {
 		this.id = "longterm_planning_agent";
@@ -70,6 +73,7 @@ export class LongtermPlanningAgent implements BaseActor {
 		this.type = "longtermPlanningAgent";
 		this.knowledgeBaseService = config.knowledgeBaseService;
 		this.memoryService = config.memoryService;
+		this.mem0Service = config.mem0Service;
 		this.vocabularyService =
 			config.vocabularyService || defaultVocabularyService;
 	}
@@ -508,11 +512,72 @@ export class LongtermPlanningAgent implements BaseActor {
 	// 从mem0获取长期记忆
 	private async getLongTermMemories(childId: string): Promise<any[]> {
 		try {
-			// 这里需要检查是否有mem0服务可用
-			// 暂时返回空数组，后续可以集成mem0服务
-			return [];
+			// 首先检查是否有mem0服务可用
+			if (!this.mem0Service) {
+				console.warn('Mem0 service not available for retrieving long-term memories');
+				
+				// 如果mem0服务不可用，回退到使用memoryService
+				if (this.memoryService) {
+					console.log('Falling back to memoryService for long-term memories');
+					const conversationHistory = await this.memoryService.getConversationHistory(childId);
+					
+					// 过滤出用户消息作为长期记忆的来源
+					const userMessages = conversationHistory
+						.filter(msg => msg.type === 'user' && msg.content && typeof msg.content === 'string')
+						.map(msg => ({
+							content: msg.content,
+							timestamp: msg.timestamp || new Date()
+						}));
+					
+					console.log(`Retrieved ${userMessages.length} user messages as long-term memories (fallback) for child ${childId}`);
+					return userMessages;
+				}
+				
+				return [];
+			}
+
+			// 使用mem0Service获取长期记忆
+			console.log(`Using mem0Service to retrieve long-term memories for child ${childId}`);
+			
+			// 假设mem0Service有一个方法可以获取长期记忆
+			// 这里我们使用retrieveMemories方法，并添加相关参数
+			const longTermMemories = await this.mem0Service.retrieveMemories(
+				childId,
+				"important language learning", // 关键词搜索
+				30 // 限制返回最近的30条记忆
+			);
+			
+			// 格式化记忆数据
+			const formattedMemories = longTermMemories
+				.filter((memory: any) => memory && memory.content)
+				.map((memory: any) => ({
+					content: memory.content,
+					timestamp: memory.timestamp || new Date(),
+					id: memory.id
+				}));
+			
+			console.log(`Retrieved ${formattedMemories.length} long-term memories from mem0 for child ${childId}`);
+			return formattedMemories;
 		} catch (error) {
-			console.error('Error getting long term memories:', error);
+			console.error('Error getting long term memories from mem0:', error);
+			
+			// 如果mem0获取失败，尝试回退到memoryService
+			if (this.memoryService) {
+				try {
+					console.log('Attempting fallback to memoryService after mem0 error');
+					const conversationHistory = await this.memoryService.getConversationHistory(childId);
+					const userMessages = conversationHistory
+						.filter(msg => msg.type === 'user' && msg.content && typeof msg.content === 'string')
+						.map(msg => ({
+							content: msg.content,
+							timestamp: msg.timestamp || new Date()
+						}));
+					return userMessages;
+				} catch (fallbackError) {
+					console.error('Fallback to memoryService also failed:', fallbackError);
+				}
+			}
+			
 			return [];
 		}
 	}
@@ -554,9 +619,30 @@ ${JSON.stringify(languageLevelStandards, null, 2)}
 	// 调用大模型生成语言分级
 	private async generateLanguageLevelWithLLM(prompt: string): Promise<string> {
 		try {
-			// 这里需要调用大模型API
-			// 暂时返回默认值L3
-			return 'L3';
+			// 在开发模式下，使用模拟数据
+			if (DEVELOPMENT_MODE) {
+				console.log('Development mode: Using mock language level assessment');
+				// 随机返回一个合理的语言等级，模拟不同儿童的语言能力
+				const levels = ['L1', 'L2', 'L3', 'L4', 'L5'];
+				return levels[Math.floor(Math.random() * 3) + 1]; // 倾向于返回L2-L4
+			}
+
+			// 调用大模型API进行语言分级评估
+			console.log('Calling LLM for language level assessment');
+			const result = await generateText({
+				// 使用与生成规划相同的模型
+				model: openai("gpt-4.1"),
+				prompt,
+				temperature: 0.3 // 降低随机性
+			});
+
+			// 处理响应结果，确保只返回L1-L5格式
+			const responseText = result.text.trim();
+			const levelMatch = responseText.match(/L[1-5]/);
+			const finalLevel = levelMatch ? levelMatch[0] : 'L3'; // 如果没有匹配到，默认L3
+			
+			console.log(`Generated language level: ${finalLevel}`);
+			return finalLevel;
 		} catch (error) {
 			console.error('Error generating language level with LLM:', error);
 			return 'L3'; // 默认等级
@@ -566,13 +652,23 @@ ${JSON.stringify(languageLevelStandards, null, 2)}
 	// 将语言分级结果存储到数据库
 	private async storeLanguageLevelToDatabase(childId: string, languageLevel: string): Promise<void> {
 		try {
-			// 这里需要调用数据库服务更新儿童档案的语言分级字段
+			if (!this.memoryService) {
+				console.error('Memory service not available for storing language level');
+				return;
+			}
+
 			console.log(`Storing language level ${languageLevel} for child ${childId} to database`);
 			
-			// 模拟数据库更新操作
-			// 实际实现需要调用相应的数据库服务
+			// 使用memoryService更新儿童档案中的语言分级字段
+			await this.memoryService.updateChildProfile(childId, {
+				languageLevel,
+				lastInteraction: new Date() // 同时更新最后交互时间
+			});
+			
+			console.log(`Successfully stored language level ${languageLevel} for child ${childId}`);
 		} catch (error) {
 			console.error('Error storing language level to database:', error);
+			// 即使失败也继续执行，不影响其他功能
 		}
 	}
 

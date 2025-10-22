@@ -1,6 +1,7 @@
 import { LongtermPlanningAgent } from "../actors/LongtermPlanningAgent";
 import type { KnowledgeBaseService } from "../services/knowledgeBaseService";
 import type { MemoryService } from "../services/memoryService";
+import type { Mem0Service } from "../services/mem0Service";
 import type { ActorConfig } from "./baseActorFactory";
 import type { BaseActorFactory } from "./baseActorFactory";
 
@@ -8,6 +9,7 @@ import type { BaseActorFactory } from "./baseActorFactory";
 export interface LongtermPlanningAgentConfig extends ActorConfig {
 	knowledgeBaseService: KnowledgeBaseService;
 	memoryService: MemoryService;
+	mem0Service?: Mem0Service;
 }
 
 // 长期规划Agent工厂实现
@@ -28,11 +30,12 @@ export class LongtermPlanningAgentFactory implements BaseActorFactory {
 
 		// 创建并返回长期规划Agent实例
 		// 从配置中移除已明确设置的属性，避免重复
-		const { knowledgeBaseService, memoryService, ...restConfig } =
+		const { knowledgeBaseService, memoryService, mem0Service, ...restConfig } =
 			longtermPlanningConfig;
 		const agent = new LongtermPlanningAgent({
 			knowledgeBaseService,
 			memoryService,
+			mem0Service,
 			...restConfig,
 		});
 
