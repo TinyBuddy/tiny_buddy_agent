@@ -10,7 +10,7 @@ async function testKnowledgeBaseApi() {
     
     // 测试配置
     const apiKey = 'sk-AFVxhsKKYpfMSSIho5hyqskh8Rbd96ZbVytFRy3pan09Vn1g';
-    const apiUrl = 'http://136.115.118.154/api/v1/knowledge-chat/d15b185a-a786-4039-b15b-1d6fb4a8d4e3';
+    const apiUrl = 'http://136.115.118.154/api/v1/knowledge-chat/d95dec15-9943-4a8f-9bb9-636fabe84ad0';
     const testQueries = [
       '如何学习中文',
       'Hello, how to learn Chinese words',

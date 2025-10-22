@@ -82,7 +82,7 @@ export class Mem0ApiService implements Mem0Service {
       const response = await fetch(`${this.baseUrl}/v1/memories`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': `Token ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -127,7 +127,7 @@ export class Mem0ApiService implements Mem0Service {
       const response = await fetch(`${this.baseUrl}/v1/memories/search`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': `Token ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -162,7 +162,7 @@ export class Mem0ApiService implements Mem0Service {
       const response = await fetch(`${this.baseUrl}/v1/memories/${memoryId}`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': `Token ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -193,7 +193,7 @@ export class Mem0ApiService implements Mem0Service {
       const response = await fetch(`${this.baseUrl}/v1/memories/${memoryId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': `Token ${this.apiKey}`,
         },
       });
       
@@ -232,7 +232,7 @@ export class Mem0ApiService implements Mem0Service {
       const response = await fetch(`${this.baseUrl}/v1/memories?childId=${childId}&limit=${limit}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': `Token ${this.apiKey}`,
         },
       });
       

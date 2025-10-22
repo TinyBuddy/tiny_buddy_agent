@@ -380,7 +380,7 @@ export class Mem0MemoryService implements MemoryService {
     
     for (const memory of memories) {
       if (memory.id) {
-        await this.makeMem0Request(`${mem0Endpoints.memories}/${memory.id}`, 'DELETE');
+        await this.makeMem0Request(mem0Endpoints.memoryById(memory.id), 'DELETE');
       }
     }
   }
@@ -394,7 +394,7 @@ export class Mem0MemoryService implements MemoryService {
 
     const url = `${config.baseUrl}${endpoint}`;
     const headers = {
-      'Authorization': `Bearer ${config.apiKey}`,
+      'Authorization': `Token ${config.apiKey}`,
       'Content-Type': 'application/json',
     };
 

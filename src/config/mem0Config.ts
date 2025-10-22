@@ -12,7 +12,7 @@ export interface Mem0Config {
 
 // 默认mem0配置
 export const defaultMem0Config: Mem0Config = {
-  apiKey: process.env.MEM0_API_KEY || '',
+  apiKey: process.env.MEM0_API_KEY || 'm0-hYC6qy3FowTYfpKdUmmHfmUhsDEazPedE670EKYl',
   baseUrl: process.env.MEM0_BASE_URL || 'https://api.mem0.ai',
   enabled: process.env.MEM0_ENABLED === 'true',
   memoryType: 'episodic',
@@ -58,6 +58,7 @@ export const memoryTypeMapping = {
 // mem0 API端点
 export const mem0Endpoints = {
   memories: '/v1/memories',
+  memoryById: (id: string) => `/v1/memories/${id}`,
   search: '/v1/memories/search',
   agents: '/v1/agents',
 } as const;

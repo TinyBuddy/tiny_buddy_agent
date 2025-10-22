@@ -355,7 +355,7 @@ export class ExecutionAgent implements BaseActor {
 	private async fetchKnowledgeFromRemoteApi(query: string): Promise<any> {
 		try {
 			const apiKey = 'sk-AFVxhsKKYpfMSSIho5hyqskh8Rbd96ZbVytFRy3pan09Vn1g';
-			const apiUrl = 'http://136.115.118.154/api/v1/knowledge-chat/d15b185a-a786-4039-b15b-1d6fb4a8d4e3';
+			const apiUrl = 'http://136.115.118.154/api/v1/knowledge-chat/d95dec15-9943-4a8f-9bb9-636fabe84ad0';
 			
 			console.log(`正在调用知识库API，查询: ${query}`);
 			
@@ -704,10 +704,7 @@ export class ExecutionAgent implements BaseActor {
 			console.log(`Loading important long-term memories for child ${childId}...`);
 
 			// 直接召回已标记为重要的记忆（使用标签过滤）
-			const importantMemories = await this.mem0Service.retrieveMemories(childId, "", { 
-				limit: 20,
-				tags: ["important", "long_term"]
-			});
+			const importantMemories = await this.mem0Service.retrieveMemories(childId, "important long_term", 20);
 
 			if (importantMemories && importantMemories.length > 0) {
 				console.log(`Found ${importantMemories.length} pre-stored important memories for child ${childId}`);

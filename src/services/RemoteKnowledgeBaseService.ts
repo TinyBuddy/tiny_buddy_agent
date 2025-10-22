@@ -14,7 +14,7 @@ export class RemoteKnowledgeBaseService implements KnowledgeBaseService {
   constructor() {
     // 从环境变量获取API密钥和URL，如果没有则使用默认值
     this.apiKey = process.env.KNOWLEDGE_BASE_API_KEY || 'sk-AFVxhsKKYpfMSSIho5hyqskh8Rbd96ZbVytFRy3pan09Vn1g';
-    this.apiUrl = process.env.KNOWLEDGE_BASE_API_URL || 'http://136.115.118.154/api/v1/knowledge-chat/d15b185a-a786-4039-b15b-1d6fb4a8d4e3';
+    this.apiUrl = process.env.KNOWLEDGE_BASE_API_URL || 'http://136.115.118.154/api/v1/knowledge-chat/d95dec15-9943-4a8f-9bb9-636fabe84ad0';
   }
 
   /**
