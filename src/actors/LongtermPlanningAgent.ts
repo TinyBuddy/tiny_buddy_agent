@@ -228,6 +228,9 @@ export class LongtermPlanningAgent implements BaseActor {
 			// 5. 提取并存储中文词汇
 			await this.extractAndStoreChineseVocabulary(childId, recentMessages);
 
+			// 6. 执行语言分级评估
+			await this.performLanguageLevelAssessment(childId, childProfile, recentMessages);
+
 			console.log(`为用户 ${childProfile.name}(${childId}) 生成了长期规划`);
 			console.log(
 				`存储的中文词汇数量: ${this.vocabularyStore.vocabularyMap.get(childId)?.size || 0}`,
@@ -443,6 +446,133 @@ export class LongtermPlanningAgent implements BaseActor {
 			console.log(`用户 ${childId} 的词汇集合:`, Array.from(vocabularySet));
 		} catch (error) {
 			console.error("提取中文词汇失败:", error);
+		}
+	}
+
+	// 执行语言分级评估
+	private async performLanguageLevelAssessment(
+		childId: string,
+		childProfile: ChildProfile,
+		recentMessages: Message[],
+	): Promise<void> {
+		try {
+			// 1. 从本地文件读取语言分级标准
+			const languageLevelStandards = await this.loadLanguageLevelStandards();
+			
+			// 2. 从mem0获取长期记忆（如果可用）
+			const longTermMemories = await this.getLongTermMemories(childId);
+			
+			// 3. 构建语言分级评估提示词
+			const assessmentPrompt = this.buildLanguageAssessmentPrompt(
+				childProfile,
+				recentMessages,
+				longTermMemories,
+				languageLevelStandards
+			);
+			
+			// 4. 调用大模型进行语言分级评估
+			const languageLevel = await this.generateLanguageLevelWithLLM(assessmentPrompt);
+			
+			// 5. 将语言分级结果存储到数据库
+			await this.storeLanguageLevelToDatabase(childId, languageLevel);
+			
+			console.log(`为用户 ${childProfile.name}(${childId}) 完成语言分级评估: ${languageLevel}`);
+		} catch (error) {
+			console.error(`语言分级评估失败:`, error);
+		}
+	}
+
+	// 从本地文件读取语言分级标准
+	private async loadLanguageLevelStandards(): Promise<any> {
+		try {
+			const fs = require('fs');
+			const path = require('path');
+			
+			const levelSpeakingPath = path.join(__dirname, '..', '..', '..', 'level speaking.md');
+			
+			if (fs.existsSync(levelSpeakingPath)) {
+				const content = fs.readFileSync(levelSpeakingPath, 'utf-8');
+				// 解析JSON格式的语言分级标准
+				// 这里假设文件内容是JSON格式
+				return JSON.parse(content);
+			} else {
+				console.warn('Language level standards file not found:', levelSpeakingPath);
+				return {};
+			}
+		} catch (error) {
+			console.error('Error loading language level standards:', error);
+			return {};
+		}
+	}
+
+	// 从mem0获取长期记忆
+	private async getLongTermMemories(childId: string): Promise<any[]> {
+		try {
+			// 这里需要检查是否有mem0服务可用
+			// 暂时返回空数组，后续可以集成mem0服务
+			return [];
+		} catch (error) {
+			console.error('Error getting long term memories:', error);
+			return [];
+		}
+	}
+
+	// 构建语言分级评估提示词
+	private buildLanguageAssessmentPrompt(
+		childProfile: ChildProfile,
+		recentMessages: Message[],
+		longTermMemories: any[],
+		languageLevelStandards: any
+	): string {
+		const messageContent = recentMessages
+			.map(msg => `${msg.type === "user" ? "User" : "Assistant"}: ${msg.content}`)
+			.join('\n');
+		
+		const memoryContent = longTermMemories
+			.map(memory => memory.content || '')
+			.join('\n');
+		
+		return `请根据以下信息评估儿童的语言能力等级（L1-L5）：
+
+儿童信息：
+- 姓名：${childProfile.name}
+- 年龄：${childProfile.age}
+
+近期对话记录：
+${messageContent}
+
+长期记忆信息：
+${memoryContent}
+
+语言分级标准：
+${JSON.stringify(languageLevelStandards, null, 2)}
+
+请分析该儿童的语言能力，并给出L1到L5的等级评估。
+请只返回等级编号（L1, L2, L3, L4, 或 L5），不要包含其他内容。`;
+	}
+
+	// 调用大模型生成语言分级
+	private async generateLanguageLevelWithLLM(prompt: string): Promise<string> {
+		try {
+			// 这里需要调用大模型API
+			// 暂时返回默认值L3
+			return 'L3';
+		} catch (error) {
+			console.error('Error generating language level with LLM:', error);
+			return 'L3'; // 默认等级
+		}
+	}
+
+	// 将语言分级结果存储到数据库
+	private async storeLanguageLevelToDatabase(childId: string, languageLevel: string): Promise<void> {
+		try {
+			// 这里需要调用数据库服务更新儿童档案的语言分级字段
+			console.log(`Storing language level ${languageLevel} for child ${childId} to database`);
+			
+			// 模拟数据库更新操作
+			// 实际实现需要调用相应的数据库服务
+		} catch (error) {
+			console.error('Error storing language level to database:', error);
 		}
 	}
 

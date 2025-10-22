@@ -12,7 +12,7 @@ import {
 import type { KnowledgeContent } from "./models/content";
 import { type Message, createMessage } from "./models/message";
 import { InMemoryKnowledgeBaseService } from "./services/inMemoryKnowledgeBaseService";
-import { InMemoryMemoryService } from "./services/memoryService";
+import { MemoryServiceFactory } from "./services/memoryServiceFactory";
 
 // 加载环境变量
 config();
@@ -24,7 +24,8 @@ export class TinyBuddyApp {
 
 	// 服务
 	public knowledgeBaseService: InMemoryKnowledgeBaseService;
-	public memoryService: InMemoryMemoryService;
+	public memoryService: any; // 记忆服务（通过工厂创建）
+	public mem0Service: any; // mem0记忆库服务
 
 	// Actor管理器
 	private actorManager: ActorManager;
@@ -35,7 +36,13 @@ export class TinyBuddyApp {
 	// 私有构造函数
 	private constructor() {
 		this.knowledgeBaseService = new InMemoryKnowledgeBaseService();
-		this.memoryService = new InMemoryMemoryService();
+		
+		// 记忆服务将在init方法中异步创建
+		this.memoryService = null;
+		
+		// 直接mem0服务实例（如果可用）
+		this.mem0Service = MemoryServiceFactory.getMem0Service();
+		
 		this.actorManager = ActorManager.getInstance();
 	}
 
@@ -56,9 +63,17 @@ export class TinyBuddyApp {
 
 		console.log("正在初始化TinyBuddy应用...");
 
+		// 使用记忆服务工厂创建记忆服务实例
+		this.memoryService = await MemoryServiceFactory.createMemoryService();
+
 		// 初始化服务
 		await this.knowledgeBaseService.init();
-		await this.memoryService.init();
+		
+		// 初始化mem0服务
+		if (this.mem0Service && typeof this.mem0Service.init === 'function') {
+			await this.mem0Service.init();
+			console.log("mem0记忆库服务初始化完成");
+		}
 
 		// 注册Actor工厂
 		this.actorManager.registerFactory(new PlanningAgentFactory());
@@ -586,7 +601,7 @@ export class TinyBuddyApp {
 		}
 
 		const history = await this.memoryService.getConversationHistory(childId);
-		return history.map((msg) => ({
+		return history.map((msg: any) => ({
 			id: msg.id,
 			type: msg.type,
 			content: msg.content,

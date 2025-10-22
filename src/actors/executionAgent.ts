@@ -8,6 +8,7 @@ import type { ChildProfile } from "../models/childProfile";
 import type { Message } from "../models/message";
 import type { KnowledgeBaseService } from "../services/knowledgeBaseService";
 import type { MemoryService } from "../services/memoryService";
+import type { Mem0Service } from "../services/mem0Service";
 // 执行Agent
 import type { ActorContext, BaseActor } from "./baseActor";
 
@@ -23,6 +24,7 @@ interface ExecutionAgentConfig {
 	model?: string;
 	knowledgeBaseService?: KnowledgeBaseService;
 	memoryService?: MemoryService;
+	mem0Service?: Mem0Service;
 }
 
 // 执行计划接口
@@ -45,11 +47,12 @@ export class ExecutionAgent implements BaseActor {
 	private currentPlan: unknown = null;
 	private knowledgeBaseService: KnowledgeBaseService | undefined;
 	private memoryService: MemoryService | undefined;
+	private mem0Service: Mem0Service | undefined;
 
 	constructor(config: ExecutionAgentConfig = {}) {
 		this.id = "execution_agent";
-		this.name = "执行Agent";
-		this.description = "负责根据规划Agent的计划与儿童进行实际互动";
+		this.name = "Execution Agent";
+		this.description = "Responsible for executing interaction plans with children based on planning agent's strategy";
 		this.type = "executionAgent";
 		this.config = {
 			useLLM: true,
@@ -58,6 +61,7 @@ export class ExecutionAgent implements BaseActor {
 		};
 		this.knowledgeBaseService = config.knowledgeBaseService;
 		this.memoryService = config.memoryService;
+		this.mem0Service = config.mem0Service;
 	}
 
 	async init(context?: ActorContext): Promise<void> {
@@ -78,6 +82,9 @@ export class ExecutionAgent implements BaseActor {
 		onStreamChunk?: (chunk: string) => void;
 	}): Promise<{ output: string; metadata?: Record<string, unknown> }> {
 		console.log("executionAgent process input :", input);
+
+		// 检查内存中是否有对话数据，如果没有则从mem0读取长期记忆
+		await this.checkAndLoadMem0Memories(input.context.childProfile.id);
 
 		// 获取相关知识（统一处理，无论是否有计划）
 		let relevantKnowledge = input.relevantKnowledge;
@@ -154,42 +161,45 @@ export class ExecutionAgent implements BaseActor {
 				console.log("executionAgent prompt :", prompt);
 
 				// 调用大模型生成初始响应
-				const response = await this.generateResponse(
-					prompt,
-					input.onStreamChunk
-				);
+		const response = await this.generateResponse(
+			prompt,
+			input.onStreamChunk
+		);
 
-				// 确定交互类型
-				const interactionType = this.state.currentInteractionType || "chat";
+		// 将对话历史存入mem0长期记忆
+		await this.storeConversationToMem0(input.context.childProfile.id, input.input, response);
 
-				// 确定学习点（如果有）
-				let learningPoint = null;
-				const progress = 10;
+		// 确定交互类型
+		const interactionType = this.state.currentInteractionType || "chat";
 
-				if (interactionType === "学习") {
-					// 对于学习类型的互动，提取学习点
-					learningPoint = `lesson_${Date.now()}`;
-				}
+		// 确定学习点（如果有）
+		let learningPoint = null;
+		const progress = 10;
 
-				let music :string = ""
-				// 解析relevantKnowledge中的音乐链接
-				if (relevantKnowledge && typeof relevantKnowledge.content === 'string') {
-					const musicLinkMatch = relevantKnowledge.content.match(/https:\/\/storage\.googleapis\.com\/tinybuddy\/songs\/[^"'\s]+\.MP3/i);
-					if (musicLinkMatch && musicLinkMatch[0]) {
-						music = musicLinkMatch[0];
-					}
-				}
+		if (interactionType === "学习") {
+			// 对于学习类型的互动，提取学习点
+			learningPoint = `lesson_${Date.now()}`;
+		}
 
-				return {
-					output: response,
-					metadata: {
-						interactionType,
-						learningPoint,
-						progress,
-						prompt,
-						music,
-					},
-				};
+		let music :string = ""
+		// 解析relevantKnowledge中的音乐链接
+		if (relevantKnowledge && typeof relevantKnowledge.content === 'string') {
+			const musicLinkMatch = relevantKnowledge.content.match(/https:\/\/storage\.googleapis\.com\/tinybuddy\/songs\/[^"'\s]+\.MP3/i);
+			if (musicLinkMatch && musicLinkMatch[0]) {
+				music = musicLinkMatch[0];
+			}
+		}
+
+		return {
+			output: response,
+			metadata: {
+				interactionType,
+				learningPoint,
+				progress,
+				prompt,
+				music,
+			},
+		};
 			} catch (error) {
 				console.error("生成初始响应失败:", error);
 				// 降级到默认初始响应
@@ -326,7 +336,12 @@ export class ExecutionAgent implements BaseActor {
 			);
 
 			// 调用大模型生成响应
-			return await this.generateResponse(prompt, onStreamChunk);
+		const response = await this.generateResponse(prompt, onStreamChunk);
+
+		// 将对话历史存入mem0长期记忆
+		await this.storeConversationToMem0(context.childProfile.id, message, response);
+
+		return response;
 		} catch (error) {
 			console.error("大模型调用失败:", error);
 			// 降级到默认响应
@@ -623,6 +638,376 @@ export class ExecutionAgent implements BaseActor {
 		];
 	}
 
+	// 检查并加载mem0长期记忆
+	private async checkAndLoadMem0Memories(childId: string): Promise<void> {
+		if (!this.mem0Service || !this.memoryService) {
+			console.log("mem0Service or memoryService not available, skipping mem0 memory loading");
+			return;
+		}
+
+		try {
+			// 检查内存中是否有对话历史
+			const conversationHistory = await this.memoryService.getConversationHistory(childId);
+			
+			// 如果内存中没有对话数据，从mem0读取长期记忆
+			if (conversationHistory.length === 0) {
+				console.log(`No conversation history found in memory for child ${childId}, loading from mem0...`);
+				
+				// 异步读取mem0长期记忆
+				this.loadMem0MemoriesAsync(childId);
+			} else {
+				console.log(`Found ${conversationHistory.length} conversation records in memory for child ${childId}`);
+				
+				// 即使内存中有数据，也加载重要的长期记忆
+				this.loadImportantLongTermMemories(childId);
+			}
+		} catch (error) {
+			console.error("Error checking memory status:", error);
+		}
+	}
+
+	// 异步加载mem0长期记忆
+	private async loadMem0MemoriesAsync(childId: string): Promise<void> {
+		try {
+			if (!this.mem0Service) {
+				return;
+			}
+
+			// 从mem0检索长期记忆
+			const mem0Memories = await this.mem0Service.retrieveMemories(childId, "recent conversations and important memories", 10);
+			
+			if (mem0Memories && mem0Memories.length > 0) {
+				console.log(`Loaded ${mem0Memories.length} memories from mem0 for child ${childId}`);
+				
+				// 精炼记忆内容，提取重要信息
+				const refinedMemories = this.refineMemories(mem0Memories);
+				
+				// 将精炼后的记忆存储到内存中
+				await this.storeRefinedMemoriesToMemory(childId, refinedMemories);
+				
+				console.log("Successfully loaded and refined mem0 memories into memory");
+			} else {
+				console.log("No memories found in mem0 for child", childId);
+			}
+		} catch (error) {
+			console.error("Error loading mem0 memories:", error);
+		}
+	}
+
+	// 加载重要的长期记忆（偏好、习惯、重要事件等）
+	private async loadImportantLongTermMemories(childId: string): Promise<void> {
+		try {
+			if (!this.mem0Service) {
+				return;
+			}
+
+			console.log(`Loading important long-term memories for child ${childId}...`);
+
+			// 直接召回已标记为重要的记忆（使用标签过滤）
+			const importantMemories = await this.mem0Service.retrieveMemories(childId, "", { 
+				limit: 20,
+				tags: ["important", "long_term"]
+			});
+
+			if (importantMemories && importantMemories.length > 0) {
+				console.log(`Found ${importantMemories.length} pre-stored important memories for child ${childId}`);
+				
+				// 去重并排序（按相关性）
+				const uniqueMemories = this.deduplicateMemories(importantMemories);
+				
+				// 智能精炼重要记忆
+				const refinedImportantMemories = this.refineImportantMemories(uniqueMemories);
+				
+				// 存储重要记忆到内存
+				await this.storeImportantMemoriesToMemory(childId, refinedImportantMemories);
+				
+				console.log(`Loaded ${refinedImportantMemories.length} important long-term memories from mem0`);
+			} else {
+				// 如果没有预存储的重要记忆，则进行关键词搜索（首次运行或新用户）
+				console.log("No pre-stored important memories found, performing keyword search...");
+				await this.searchAndStoreImportantMemories(childId);
+			}
+		} catch (error) {
+			console.error("Error loading important long-term memories:", error);
+		}
+	}
+
+	// 搜索并存储重要记忆（用于首次运行或新用户）
+	private async searchAndStoreImportantMemories(childId: string): Promise<void> {
+		try {
+			if (!this.mem0Service) {
+				return;
+			}
+
+			// 定义重要的记忆查询关键词
+			const importantQueries = [
+				"likes preferences favorites interests hobbies",
+				"dislikes hates fears avoids",
+				"important events achievements milestones",
+				"family friends relationships",
+				"learning progress skills knowledge"
+			];
+
+			const allImportantMemories: any[] = [];
+
+			// 并行查询所有重要类型的记忆
+			for (const query of importantQueries) {
+				try {
+					const memories = await this.mem0Service.retrieveMemories(childId, query, 3);
+					if (memories && memories.length > 0) {
+						allImportantMemories.push(...memories);
+						console.log(`Found ${memories.length} memories for query: ${query}`);
+					}
+				} catch (error) {
+					console.warn(`Error retrieving memories for query "${query}":`, error);
+				}
+			}
+
+			if (allImportantMemories.length > 0) {
+				// 去重并排序（按相关性）
+				const uniqueMemories = this.deduplicateMemories(allImportantMemories);
+				
+				// 智能精炼重要记忆
+				const refinedImportantMemories = this.refineImportantMemories(uniqueMemories);
+				
+				// 存储重要记忆到内存
+				await this.storeImportantMemoriesToMemory(childId, refinedImportantMemories);
+				
+				// 同时持久化存储到mem0中，确保重要记忆不会丢失
+				await this.storeImportantMemoriesToMem0(childId, refinedImportantMemories);
+				
+				console.log(`Searched and stored ${refinedImportantMemories.length} important long-term memories for child ${childId}`);
+			} else {
+				console.log("No important long-term memories found through keyword search for child", childId);
+			}
+		} catch (error) {
+			console.error("Error searching and storing important memories:", error);
+		}
+	}
+
+	// 精炼记忆内容，提取重要信息
+	private refineMemories(memories: any[]): string[] {
+		const refinedMemories: string[] = [];
+		
+		for (const memory of memories) {
+			if (memory.content && typeof memory.content === 'string') {
+				// 简单的精炼逻辑：提取关键信息
+				const content = memory.content;
+				
+				// 提取重要的对话片段或关键信息
+				// 这里可以添加更复杂的精炼逻辑
+				if (content.length > 50) {
+					// 提取前100个字符作为摘要
+					const summary = content.substring(0, 100) + (content.length > 100 ? '...' : '');
+					refinedMemories.push(summary);
+				} else {
+					refinedMemories.push(content);
+				}
+			}
+		}
+		
+		return refinedMemories;
+	}
+
+	// 将精炼后的记忆存储到内存中
+	private async storeRefinedMemoriesToMemory(childId: string, refinedMemories: string[]): Promise<void> {
+		if (!this.memoryService) {
+			return;
+		}
+
+		try {
+			// 将精炼后的记忆作为系统消息存储到对话历史中
+			for (const memory of refinedMemories) {
+				const memoryMessage: Message = {
+					id: `mem0_memory_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+					type: 'system',
+					content: `Important memory from previous interactions: ${memory}`,
+					timestamp: new Date(),
+					sender: 'mem0'
+				};
+				
+				await this.memoryService.addMessageToHistory(childId, memoryMessage);
+			}
+		} catch (error) {
+			console.error("Error storing refined memories to memory:", error);
+		}
+	}
+
+	// 存储重要记忆到内存（使用特殊标记）
+	private async storeImportantMemoriesToMemory(childId: string, importantMemories: string[]): Promise<void> {
+		if (!this.memoryService) {
+			return;
+		}
+
+		try {
+			// 将重要记忆作为系统消息存储到对话历史中，使用特殊标记
+			for (const memory of importantMemories) {
+				const memoryMessage: Message = {
+					id: `important_memory_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+					type: 'system',
+					content: `Important long-term memory: ${memory}`,
+					timestamp: new Date(),
+					sender: 'mem0',
+					metadata: {
+						isImportantMemory: true,
+						memoryType: 'long_term'
+					}
+				};
+				
+				await this.memoryService.addMessageToHistory(childId, memoryMessage);
+			}
+		} catch (error) {
+			console.error("Error storing important memories to memory:", error);
+		}
+	}
+
+	// 存储重要记忆到mem0进行持久化
+	private async storeImportantMemoriesToMem0(childId: string, importantMemories: string[]): Promise<void> {
+		if (!this.mem0Service) {
+			console.log("mem0Service not available, skipping important memory persistence");
+			return;
+		}
+
+		try {
+			for (const memory of importantMemories) {
+				// 为重要记忆创建唯一ID，避免重复存储
+				const memoryId = `important_${Buffer.from(memory).toString('base64').substring(0, 16)}`;
+				
+				// 存储到mem0，使用特殊标签标记为重要记忆
+				await this.mem0Service.storeMemory(childId, memory, {
+					tags: ["important", "long_term", "preference", "personality"],
+					timestamp: new Date().toISOString(),
+					metadata: {
+						memoryId: memoryId,
+						isImportant: true,
+						category: this.categorizeImportantMemory(memory)
+					}
+				});
+			}
+			
+			console.log(`Persisted ${importantMemories.length} important memories to mem0 for child ${childId}`);
+		} catch (error) {
+			console.error("Error storing important memories to mem0:", error);
+		}
+	}
+
+	// 分类重要记忆
+	private categorizeImportantMemory(memory: string): string {
+		const lowerMemory = memory.toLowerCase();
+		
+		if (/(like|love|enjoy|favorite|adore)/.test(lowerMemory)) {
+			return "preference";
+		} else if (/(dislike|hate|avoid|don't like)/.test(lowerMemory)) {
+			return "dislike";
+		} else if (/(birthday|anniversary|achievement|milestone)/.test(lowerMemory)) {
+			return "event";
+		} else if (/(good at|talented|skillful|excellent)/.test(lowerMemory)) {
+			return "strength";
+		} else if (/(struggle|difficulty|need help|challenge)/.test(lowerMemory)) {
+			return "challenge";
+		} else {
+			return "personality";
+		}
+	}
+
+	// 去重记忆
+	private deduplicateMemories(memories: any[]): any[] {
+		const seen = new Set();
+		return memories.filter(memory => {
+			if (!memory.id) return true;
+			if (seen.has(memory.id)) return false;
+			seen.add(memory.id);
+			return true;
+		}).sort((a, b) => (b.relevance || 0) - (a.relevance || 0)); // 按相关性排序
+	}
+
+	// 智能精炼重要记忆
+	private refineImportantMemories(memories: any[]): string[] {
+		const refinedMemories: string[] = [];
+		
+		for (const memory of memories) {
+			if (memory.content && typeof memory.content === 'string') {
+				const content = memory.content;
+				
+				// 智能提取关键信息
+				let refinedContent = this.extractKeyInformation(content);
+				
+				// 如果提取失败，使用摘要
+				if (!refinedContent) {
+					refinedContent = content.length > 100 ? 
+						content.substring(0, 100) + '...' : content;
+				}
+				
+				// 确保refinedContent不是null
+				if (refinedContent) {
+					refinedMemories.push(refinedContent);
+				}
+			}
+		}
+		
+		return refinedMemories;
+	}
+
+	// 提取关键信息（简单的模式匹配）
+	private extractKeyInformation(content: string): string | null {
+		// 匹配偏好相关模式（英文为主）
+		const likePatterns = [
+			/(?:like|love|enjoy|favorite|adore|prefer).*?(?:is|are|:)\s*([^.?!]+)/gi,
+			/(?:really like|absolutely love|enjoy playing|favorite thing).*?(?:is|are|:)\s*([^.?!]+)/gi
+		];
+		
+		// 匹配厌恶相关模式（英文为主）
+		const dislikePatterns = [
+			/(?:dislike|hate|don't like|avoid|not a fan of).*?(?:is|are|:)\s*([^.?!]+)/gi,
+			/(?:really dislike|absolutely hate|don't enjoy|avoid playing).*?(?:is|are|:)\s*([^.?!]+)/gi
+		];
+		
+		// 匹配重要事件（英文为主）
+		const eventPatterns = [
+			/(?:birthday|anniversary|achievement|milestone|special day).*?(?:was|is|:)\s*([^.?!]+)/gi,
+			/(?:got|received|achieved|won|celebrated).*?(?:for|on|at)\s*([^.?!]+)/gi
+		];
+
+		// 匹配性格特点和学习偏好
+		const personalityPatterns = [
+			/(?:good at|excellent in|talented with|skillful in).*?(?:is|are|:)\s*([^.?!]+)/gi,
+			/(?:struggle with|difficulty with|need help with).*?(?:is|are|:)\s*([^.?!]+)/gi,
+			/(?:learning style|prefer to learn|best way to learn).*?(?:is|are|:)\s*([^.?!]+)/gi
+		];
+
+		for (const pattern of [...likePatterns, ...dislikePatterns, ...eventPatterns, ...personalityPatterns]) {
+			const match = pattern.exec(content);
+			if (match && match[1]) {
+				return match[1].trim();
+			}
+		}
+		
+		return null;
+	}
+
+	// 将对话历史存入mem0长期记忆
+	private async storeConversationToMem0(childId: string, userMessage: string, assistantResponse: string): Promise<void> {
+		if (!this.mem0Service) {
+			console.log("mem0Service not available, skipping conversation storage");
+			return;
+		}
+
+		try {
+			// 构建对话记忆内容
+			const conversationContent = `User: ${userMessage}\nAssistant: ${assistantResponse}`;
+			
+			// 存储到mem0
+			await this.mem0Service.storeMemory(childId, conversationContent, {
+				tags: ["conversation", "interaction"],
+				timestamp: new Date().toISOString()
+			});
+			
+			console.log("Conversation stored to mem0 successfully");
+		} catch (error) {
+			console.error("Error storing conversation to mem0:", error);
+		}
+	}
+
 	// 构建提示词 - 使用Sparky角色设定（英文为主）
 	private buildPrompt(
 		message: string,
@@ -631,13 +1016,26 @@ export class ExecutionAgent implements BaseActor {
 		plan?: any,
 		relevantKnowledge?: any,
 	): string {
-		const recentMessages = conversationHistory.slice(-5); // 获取最近5条消息
+		// 分离重要长期记忆和普通对话历史
+		const { importantMemories, recentConversations } = this.separateMemories(conversationHistory);
+		
+		// 获取最近10条对话记录
+		const recentMessages = recentConversations.slice(-10);
 		const chatHistory = recentMessages
 			.map((m) => `${m.type === "user" ? "Child" : "Sparky"}: ${m.content}`)
 			.join("\n");
 
 		// 从全局配置获取系统提示词
 		let systemPrompt = getFullSystemPrompt(childProfile);
+
+		// 添加重要长期记忆（如果有）
+		if (importantMemories.length > 0) {
+			const importantMemoryText = importantMemories
+				.map(m => m.content)
+				.join("\n");
+			systemPrompt += `\n\nImportant long-term memories about ${childProfile.name}:\n${importantMemoryText}`;
+			console.log(`Added ${importantMemories.length} important long-term memories to prompt`);
+		}
 
 		// 添加相关知识库内容（如果有）
 		if (relevantKnowledge?.content) {
@@ -650,8 +1048,6 @@ export class ExecutionAgent implements BaseActor {
 			systemPrompt += `\n\nTeaching strategy for this interaction: ${plan.strategy}\n`;
 		}
 
-		// systemPrompt += "\n\nrelevantKnowledge: 暂无\n";
-
 		// 添加计划信息（如果有）
 		if (plan?.teachingFocus) {
 			console.log("promt add plan:", plan);
@@ -659,5 +1055,21 @@ export class ExecutionAgent implements BaseActor {
 		}
 
 		return `${systemPrompt}\n\n${chatHistory}\n\nChild: ${message}\n\nSparky:`;
+	}
+
+	// 分离重要记忆和普通对话
+	private separateMemories(conversationHistory: Message[]): { importantMemories: Message[], recentConversations: Message[] } {
+		const importantMemories: Message[] = [];
+		const recentConversations: Message[] = [];
+		
+		for (const message of conversationHistory) {
+			if (message.metadata?.isImportantMemory) {
+				importantMemories.push(message);
+			} else {
+				recentConversations.push(message);
+			}
+		}
+		
+		return { importantMemories, recentConversations };
 	}
 }
