@@ -20,10 +20,12 @@ async function verifyKnowledgeFix() {
       { name: '英文查询', query: 'Hello in Chinese' }
     ];
     
-    console.log(`测试查询总数: ${testQueries.length}`);
+
+    console.log(`测试查询总数目: ${testQueries.length}`);
     console.log(`API URL: ${apiUrl}`);
     console.log('\n开始测试...\n');
     
+
     // 对每个查询进行测试
     for (const test of testQueries) {
       console.log(`=== 测试: ${test.name} ===`);
