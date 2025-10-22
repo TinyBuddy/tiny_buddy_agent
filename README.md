@@ -1,193 +1,249 @@
-<div align="center">
-  <h1>🐻 TinyBuddy 儿童智能陪伴助手</h1>
-  <p>专为儿童设计的智能陪伴与教育AI助手</p>
-  
-  <p>
-    <a href="https://github.com/TinyBuddy/tiny_buddy_agent"><img src="https://img.shields.io/badge/GitHub-TinyBuddy-blue" alt="GitHub Repository" /></a>
-    <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen" alt="Node Version" /></a>
-    <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/typescript-%5E5.0-blue" alt="TypeScript" /></a>
-  </p>
-</div>
+# TinyBuddy Multi-Agent System
 
-## 📚 项目介绍
+TinyBuddy是一个专为4-7岁儿童设计的智能助手Agent系统，可以通过多种方式进行交互：Console UI测试界面、HTTP API、WebSocket连接，以及新的原子SDK接口。
 
-TinyBuddy是一款专为儿童设计的智能陪伴助手，旨在提供安全、有趣且富有教育意义的互动体验。通过先进的AI技术，TinyBuddy能够根据儿童的年龄、兴趣和学习进度，提供个性化的陪伴和教育内容。
+## 功能特点
 
-## 🚀 快速开始
+- **友好的儿童交互**：专为4-7岁儿童设计，使用适合儿童的语言风格
+- **多模态交互**：支持文本输入和流式响应输出
+- **多接口支持**：同时提供Console UI、HTTP API、WebSocket接口和SDK
+- **真实LLM模型**：基于DeepSeek的模型进行决策和规划
+- **流式响应**：通过WebSocket实现流式输出，避免阻塞
+- **健康检查**：提供连接状态和DeepSeek API连接测试功能
+- **双Agent架构**：Planning Agent负责策略制定，Execution Agent负责交互执行
+- **知识库支持**：包含聊天、歌曲、故事、游戏和学习内容
+- **原子SDK**：提供易于集成的SDK接口
+- **英文支持**：兼容海外大语言模型，适用于美国小朋友
 
-### 前提条件
+## 技术架构
 
-- Node.js 20+ 
-- Git
-- OpenAI API Key（可选，可稍后配置）
-  - 在[OpenAI平台](https://platform.openai.com/api-keys)获取您的API密钥
+- **主应用层**：`src/app.ts`实现TinyBuddy的核心功能和智能交互逻辑
+- **HTTP服务器**：`src/api/server.ts`提供RESTful API接口
+- **WebSocket服务器**：`src/api/webSocketServer.ts`提供实时流式通信接口
+- **入口文件**：`src/index.ts`统一启动所有服务并导出SDK
+- **SDK**：`src/sdk.ts`提供原子SDK接口
+- **Agent实现**：`src/actors/`包含Planning Agent和Execution Agent实现
+- **知识库**：`src/services/inMemoryKnowledgeBaseService.ts`管理系统知识内容
 
-### 安装
+## 安装与配置
+
+### 1. 安装依赖
 
 ```bash
-# 克隆仓库
-git clone https://github.com/TinyBuddy/tiny_buddy_agent.git
-cd tiny_buddy_agent
-
-# 安装依赖
 npm install
-
-# 复制环境变量文件
-cp .env.example .env
 ```
 
-### 配置
+### 2. 配置环境变量
 
-编辑`.env`文件添加您的API密钥：
-
-```env
-OPENAI_API_KEY=your-api-key-here
-```
-
-### 运行应用
+复制`.env.example`文件并重命名为`.env`，然后填写必要的配置：
 
 ```bash
-# 开发模式
-npm run dev
+# DeepSeek API密钥
+DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-# 生产构建
-npm run build
+# DeepSeek模型名称（可选，默认使用deepseek-chat）
+DEEPSEEK_MODEL=deepseek-chat
+```
 
-# 启动生产服务器
+### 3. 启动应用
+
+```bash
 npm start
 ```
 
-## 🎯 核心功能
+应用启动后，会同时启动三个服务：
+- **Console UI**：http://localhost:3141
+- **HTTP API**：http://localhost:3142
+- **WebSocket Server**：ws://localhost:3143
 
-- **个性化交互**：基于儿童的年龄、兴趣和学习进度提供定制化回应
-- **儿童档案管理**：存储和管理儿童的基本信息、兴趣爱好和学习记录
-- **对话历史记录**：保存和回顾与儿童的对话内容
-- **学习进度跟踪**：记录和分析儿童在各知识点上的学习进展
-- **双Agent架构**：使用规划Agent和执行Agent协同工作，提供更智能的回应
-- **命令行交互界面**：简单易用的终端交互方式
+## SDK使用说明
 
-## 🛠️ 项目架构
+TinyBuddy提供了一个简洁的SDK，允许第三方项目轻松集成和使用多Agent系统功能。
 
-TinyBuddy采用模块化的架构设计，包含以下主要组件：
+### 基本用法
 
-- **应用核心**：`TinyBuddyApp`类管理整个应用的生命周期和服务
-- **Actor系统**：包括规划Agent和执行Agent，负责处理用户输入和生成响应
-- **记忆服务**：管理儿童档案、对话历史和学习进度
-- **知识库服务**：存储和检索教育内容和互动素材
+```javascript
+import { createTinyBuddySDK } from 'tiny-buddy-agent';
 
-## 📁 项目结构
+// 初始化SDK
+const sdk = await createTinyBuddySDK('child_123');
 
-```
-tiny_buddy_agent/
-├── src/                      # 源代码目录
-│   ├── actors/               # AI智能体实现
-│   │   ├── baseActor.ts      # 基础智能体类
-│   │   ├── executionAgent.ts # 执行智能体
-│   │   └── planningAgent.ts  # 规划智能体
-│   ├── app.ts                # 应用核心类
-│   ├── factories/            # 智能体工厂
-│   │   ├── actorManager.ts         # 智能体管理器
-│   │   ├── baseActorFactory.ts     # 基础智能体工厂
-│   │   ├── executionAgentFactory.ts # 执行智能体工厂
-│   │   └── planningAgentFactory.ts  # 规划智能体工厂
-│   ├── index.ts              # 应用入口文件
-│   ├── models/               # 数据模型
-│   │   ├── childProfile.ts   # 儿童档案模型
-│   │   ├── content.ts        # 内容模型
-│   │   └── message.ts        # 消息模型
-│   ├── services/             # 服务层
-│   │   ├── inMemoryKnowledgeBaseService.ts # 内存知识库服务
-│   │   ├── knowledgeBaseService.ts  # 知识库服务接口
-│   │   └── memoryService.ts  # 记忆服务
-│   ├── tools/                # 工具集合
-│   │   ├── index.ts          # 工具导出
-│   │   └── weather.ts        # 天气工具示例
-│   └── workflows/            # 工作流定义
-│       └── index.ts          # 工作流导出
-├── .env                      # 环境变量配置
-├── .gitignore                # Git忽略文件配置
-├── Dockerfile                # Docker部署配置
-├── package.json              # 项目依赖配置
-└── tsconfig.json             # TypeScript配置
+// 处理用户输入并获取响应
+const response = await sdk.processUserInput('Tell me a story about animals');
+console.log('TinyBuddy response:', response);
+
+// 获取对话历史
+const history = await sdk.getConversationHistory();
+
+// 更新儿童档案
+await sdk.updateChildProfile({
+  interests: ['animals', 'science', 'painting'],
+  age: 6
+});
+
+// 使用完毕后，关闭SDK
+await sdk.shutdown();
 ```
 
-## 💬 使用指南
+### 高级用法
 
-启动应用后，您可以通过命令行界面与TinyBuddy进行交互：
+```javascript
+import TinyBuddySDK from 'tiny-buddy-agent';
+
+// 创建特定儿童ID的实例
+const sdk = new TinyBuddySDK('child_456');
+
+// 手动初始化
+const initResult = await sdk.init();
+if (!initResult.success) {
+  console.error('SDK初始化失败:', initResult.message);
+}
+
+// 添加自定义知识库内容
+await sdk.addKnowledgeContent({
+  title: 'The Solar System',
+  description: 'Learn about the planets in our solar system',
+  content: JSON.stringify({
+    planets: ['Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune'],
+    facts: 'The Sun is at the center of our solar system.'
+  }),
+  language: 'en',
+  difficulty: 'medium',
+  categories: ['science', 'astronomy']
+});
+
+// 分析儿童兴趣
+const interests = await sdk.analyzeChildInterests();
+console.log('Child interests:', interests);
+
+// 检查SDK运行状态
+const isRunning = sdk.isRunning();
+console.log('SDK is running:', isRunning);
+```
+
+## 多Agent系统工作流程
+
+1. **输入处理**：通过SDK接收用户输入
+2. **规划阶段**：Planning Agent根据用户输入、儿童档案和知识库创建交互计划
+3. **执行阶段**：Execution Agent根据计划生成响应
+4. **响应**：将最终响应返回给用户
+5. **历史更新**：交互内容被保存到对话历史
+
+## 知识库内容
+
+知识库包含以下类型的内容：
+- **聊天**：关于感受、爱好等日常对话
+- **歌曲**：包含歌词和旋律的儿童歌曲
+- **故事**：教育性和娱乐性故事
+- **游戏**：用于学习和娱乐的互动游戏
+- **学习**：关于各种主题的教育内容
+
+## 使用方式
+
+### 1. Console UI测试
+
+访问 http://localhost:3141 可以使用VoltAgent提供的可视化控制台测试TinyBuddy的功能。
+
+### 2. HTTP API调用
+
+可以通过HTTP请求与TinyBuddy交互，支持流式响应：
 
 ```bash
-# 启动应用
-npm run dev
-
-# 应用启动后，可以直接在命令行中输入内容与TinyBuddy交流
-你: 你好，TinyBuddy！
-TinyBuddy正在思考...
-TinyBuddy: 你好呀，小朋友！今天过得怎么样？
-
-# 特殊命令
-你: clear    # 清空对话历史
-你: exit     # 退出程序
+curl -X POST http://localhost:3142/api/chat \-H "Content-Type: application/json" \-d '{"userId":"child1","message":"你好啊"}'
 ```
 
-## 🐳 Docker部署
+### 3. WebSocket连接
 
-可以使用Docker来容器化部署TinyBuddy：
+可以通过WebSocket与TinyBuddy建立实时连接，接收流式响应：
 
-```bash
-# 构建Docker镜像
-docker build -t tiny_buddy_agent .
+1. **连接初始化**：
+   ```javascript
+   const socket = new WebSocket('ws://localhost:3143');
+   socket.onopen = () => {
+     socket.send(JSON.stringify({
+       type: 'initialize',
+       userId: 'child1'
+     }));
+   };
+   ```
 
-# 运行Docker容器
-docker run -p 3141:3141 --env-file .env tiny_buddy_agent
+2. **发送消息**：
+   ```javascript
+   socket.send(JSON.stringify({
+     type: 'user_input',
+     userId: 'child1',
+     message: '你能给我讲个故事吗？'
+   }));
+   ```
+
+3. **接收流式响应**：
+   ```javascript
+   socket.onmessage = (event) => {
+     const data = JSON.parse(event.data);
+     if (data.type === 'agent_response') {
+       console.log('接收到响应:', data.content);
+       if (data.isFinal) {
+         console.log('响应完成');
+       }
+     }
+   };
+   ```
+
+### 4. 连接检查
+
+可以通过WebSocket检查DeepSeek API连接状态：
+
+```javascript
+socket.send(JSON.stringify({
+  type: 'check_connection',
+  userId: 'child1'
+}));
 ```
 
-## 🧪 开发指南
+## 项目结构
 
-### 可用脚本
+```
+src/
+  ├── api/                # API相关文件
+  │   ├── server.ts       # HTTP服务器实现
+  │   ├── webSocketServer.ts # WebSocket服务器实现
+  │   └── webSocketClientExample.ts # WebSocket客户端示例
+  ├── app.ts              # 主应用实现
+  └── index.ts            # 应用入口文件
+.env.example              # 环境变量配置示例
+package.json              # 项目依赖配置
+README.md                 # 项目文档
+```
 
-- `npm run dev` - 启动开发服务器
-- `npm run build` - 构建生产版本
-- `npm start` - 运行生产版本
+## 开发说明
 
-### 扩展功能
+1. 修改应用逻辑：编辑`src/app.ts`文件
+2. 修改API端点：编辑`src/api/server.ts`文件
+3. 修改WebSocket逻辑：编辑`src/api/webSocketServer.ts`文件
 
-TinyBuddy的模块化设计使其易于扩展。您可以：
+## 服务端口配置
 
-1. **添加新工具**：在`src/tools/`目录下创建新的工具模块
-2. **扩展智能体能力**：修改`src/actors/`目录下的智能体实现
-3. **增强数据模型**：更新`src/models/`目录下的数据结构
+- **Console UI**: 3141
+- **HTTP API**: 3142
+- **WebSocket Server**: 3143
 
-## 🔒 安全考虑
+## 支持的消息类型
 
-TinyBuddy专为儿童设计，我们特别注重以下安全方面：
+### WebSocket消息类型
 
-- 不收集或存储敏感个人信息
-- 所有数据默认存储在本地内存中
-- 提供适合儿童的内容过滤机制
-- 简单易用的家长控制选项
+- `initialize`: 初始化连接和用户会话
+- `user_input`: 发送用户输入
+- `agent_response`: 接收Agent响应（服务器发送）
+- `ping`: 心跳消息
+- `check_connection`: 检查DeepSeek API连接状态
+- `connection_status`: 连接状态响应（服务器发送）
 
-## 🤝 贡献指南
+## 注意事项
 
-我们欢迎社区贡献！如果您有任何想法或改进，请：
+1. 确保已正确配置DeepSeek API密钥
+2. 本应用专为儿童设计，请确保使用适当的内容过滤机制
+3. 在生产环境中，请确保保护好API密钥和用户数据
 
-1. Fork项目仓库
-2. 创建您的功能分支
-3. 提交您的更改
-4. 推送到您的分支
-5. 提交Pull Request
+## License
 
-## 📄 许可证
-
-本项目采用MIT许可证 - 详见LICENSE文件获取详细信息
-
-## 📧 联系我们
-
-如有任何问题或建议，请随时联系我们：
-
-- GitHub Issues: [提交问题](https://github.com/TinyBuddy/tiny_buddy_agent/issues)
-
----
-
-<div align="center">
-  <p>用❤️打造的儿童智能陪伴助手</p>
-</div>
+MIT License
