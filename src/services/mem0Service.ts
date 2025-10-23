@@ -127,6 +127,13 @@ export class Mem0ApiService implements Mem0Service {
     }
     
     try {
+      // 根据mem0 API文档格式构建请求体
+      const filters = {
+        OR: [
+          { user_id: childId }
+        ]
+      };
+      
       const response = await fetch(`${this.baseUrl}/v2/memories/search`, {
         method: 'POST',
         headers: {
@@ -135,12 +142,8 @@ export class Mem0ApiService implements Mem0Service {
         },
         body: JSON.stringify({
           query,
-          filters: {
-            user_id: childId,
-            app_id: 'tiny_buddy_agent'
-          },
-          top_k: limit,
-          version: 'v2'
+          filters: filters,
+          top_k: limit
         }),
       });
       
@@ -195,15 +198,29 @@ export class Mem0ApiService implements Mem0Service {
     }
     
     try {
+      // 确保memoryId有效
+      if (!memoryId || typeof memoryId !== 'string') {
+        throw new Error('无效的记忆ID');
+      }
+      
+      // 根据mem0 API文档，使用DELETE方法删除特定记忆
       const response = await fetch(`${this.baseUrl}/v1/memories/${memoryId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Token ${this.apiKey}`,
+          'Content-Type': 'application/json',
         },
       });
       
       if (!response.ok) {
-        throw new Error(`mem0 API错误: ${response.status} ${response.statusText}`);
+        // 尝试获取详细错误信息
+        let errorDetail = '';
+        try {
+          errorDetail = await response.text();
+        } catch (e) {
+          // 如果无法获取详细信息，继续使用状态文本
+        }
+        throw new Error(`mem0 API错误: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
       }
       
       console.log(`✅ 记忆删除成功 - ID: ${memoryId}`);
@@ -235,6 +252,13 @@ export class Mem0ApiService implements Mem0Service {
     
     try {
       // 使用POST方法搜索特定儿童的所有记忆
+      // 使用与API文档一致的过滤器格式
+      const filters = {
+        OR: [
+          { user_id: childId }
+        ]
+      };
+      
       const response = await fetch(`${this.baseUrl}/v2/memories/search`, {
         method: 'POST',
         headers: {
@@ -243,12 +267,8 @@ export class Mem0ApiService implements Mem0Service {
         },
         body: JSON.stringify({
           query: '', // 空查询返回所有记忆
-          filters: {
-            user_id: childId,
-            app_id: 'tiny_buddy_agent'
-          },
-          top_k: limit,
-          version: 'v2'
+          filters: filters,
+          top_k: limit
         }),
       });
       

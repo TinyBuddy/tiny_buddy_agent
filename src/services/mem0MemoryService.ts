@@ -371,13 +371,23 @@ export class Mem0MemoryService implements MemoryService {
   private async searchMemories(childId: string, ...tags: string[]): Promise<Mem0Memory[]> {
     try {
       // 使用POST方法进行记忆搜索，支持更复杂的查询条件
+      // 使用类型断言避免TypeScript类型错误
+      const filters = {
+        OR: [
+          { user_id: childId !== '*' ? childId : 'default_user' }
+        ]
+      } as any;
+      
+      // 如果有标签过滤，添加到filters中
+      if (tags.length > 0) {
+        // 使用any类型绕过TypeScript类型检查
+        (filters.OR as any[]).push({ tags: { in: tags } });
+      }
+      
       const searchData = {
         query: '', // 空查询返回所有匹配的记忆
-        filters: {
-          childId: childId !== '*' ? childId : undefined,
-          tags: tags.length > 0 ? tags : undefined,
-        },
-        limit: 100, // 限制返回结果数量
+        filters: filters,
+        top_k: 100, // 限制返回结果数量
       };
       
       const response = await this.makeMem0Request(mem0Endpoints.search, 'POST', searchData);
