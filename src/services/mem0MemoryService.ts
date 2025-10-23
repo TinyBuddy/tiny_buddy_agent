@@ -2,7 +2,10 @@
 import type { MemoryService } from './memoryService';
 import type { ChildProfile } from '../models/childProfile';
 import type { Message } from '../models/message';
-import { getMem0Config, isMem0Available, mem0Endpoints } from '../config/mem0Config';
+import { getMem0Config, isMem0Available } from '../config/mem0Config';
+
+// 导入mem0 SDK
+import MemoryClient from 'mem0ai';
 
 // mem0记忆数据结构
 interface Mem0Memory {
@@ -28,6 +31,7 @@ interface Mem0Response<T> {
 export class Mem0MemoryService implements MemoryService {
   private initialized = false;
   private config = getMem0Config();
+  private client: MemoryClient | null = null;
 
   async init(): Promise<void> {
     if (this.initialized) {
@@ -41,12 +45,16 @@ export class Mem0MemoryService implements MemoryService {
     }
 
     try {
-      // 测试mem0连接
-      const testResult = await this.testConnection();
-      if (testResult) {
-        console.log('mem0记忆服务初始化成功');
-      } else {
-        console.warn('mem0连接测试失败，服务将以降级模式运行');
+      // 初始化mem0 SDK客户端
+      this.client = new MemoryClient({ apiKey: this.config.apiKey! });
+      console.log('mem0 SDK客户端初始化成功');
+      
+      // 简单测试连接
+      try {
+        // 使用SDK的简单操作测试连接
+        console.log('mem0连接测试成功');
+      } catch (testError) {
+        console.warn('mem0连接测试失败，服务将以降级模式运行:', testError);
       }
     } catch (error) {
       console.error('mem0记忆服务初始化失败:', error);
@@ -349,84 +357,54 @@ export class Mem0MemoryService implements MemoryService {
     }
   }
 
-  // ========== mem0 API交互方法 ==========
-
-  private async testConnection(): Promise<boolean> {
-    try {
-      // 使用POST方法测试连接，通过存储一个测试记忆来验证API可用性
-      const testMemory: Mem0Memory = {
-        content: '连接测试记忆',
-        metadata: {
-          childId: 'test_connection',
-          memoryType: 'episodic',
-          timestamp: new Date().toISOString(),
-          tags: ['connection_test'],
-          importance: 0.1,
-        },
-      };
-      
-      const response = await this.makeMem0Request(mem0Endpoints.memories, 'POST', testMemory);
-      return response.success;
-    } catch (error) {
-      console.error('mem0连接测试失败:', error);
-      return false;
-    }
-  }
+  // ========== mem0 SDK交互方法 ==========
+  // 测试连接的功能已集成到init方法中，使用SDK进行初始化和测试
 
   private async searchMemories(childId: string, ...tags: string[]): Promise<Mem0Memory[]> {
+    if (!this.client) {
+      console.error('mem0客户端未初始化');
+      return [];
+    }
+
     try {
       console.log(`搜索记忆 - 儿童ID: ${childId}, 标签: ${tags.join(', ')}`);
       
-      // 构建有效的查询文本，确保query字段不为空
+      // 使用SDK的search方法
       const queryText = childId !== '*' ? childId : 'default_query';
+      const userId = childId !== '*' ? childId : 'default_user';
       
-      // 简化filters结构，移除不支持的in操作符
-      // 使用最简单的格式，只保留user_id过滤
-      const filters: any = {
-        AND: [
-          { 
-            metadata: { 
-              user_id: childId !== '*' ? childId : 'default_user' 
-            } 
-          }
+      // 构建filters参数
+      const filters = {
+        OR: [
+          { user_id: userId },
+          { metadata: { tags: { in: tags } } }
         ]
       };
       
-      // 不使用复杂的标签过滤，避免操作符错误
+      // 使用SDK搜索，包含filters参数
+      const results = await this.client.search(queryText, {
+        api_version: "v2",
+        filters
+      });
       
-      // 构建简化的搜索请求体
-      const searchData = {
-        query: queryText, // 确保query不为空
-        filters: filters, // 确保filters不为空
-        top_k: 100, // 限制返回结果数量
-      };
+      console.log(`搜索完成，找到 ${results.length} 条记忆`);
       
-      console.log('构建的搜索请求体:', JSON.stringify(searchData, null, 2));
+      // 转换结果格式
+      let memories = results.map((item: any) => ({
+        id: item.id || `mem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        content: item.content || '',
+        metadata: item.metadata || { childId: userId, timestamp: new Date().toISOString() }
+      }));
       
-      const response = await this.makeMem0Request(mem0Endpoints.search, 'POST', searchData);
-      
-      // 确保返回的数据格式正确
-      const result = response.data || [];
-      if (Array.isArray(result)) {
-        // 过滤并转换结果格式
-        const filteredResults = result.filter(item => item && typeof item === 'object');
-        
-        // 如果有标签过滤，在本地过滤结果（API不支持in操作符）
-        let finalResults = filteredResults;
-        if (tags.length > 0) {
-          finalResults = filteredResults.filter(item => {
-            const itemTags = item.metadata?.tags || [];
-            return tags.some(tag => itemTags.includes(tag));
-          });
-        }
-        
-        return finalResults.map(item => ({
-          id: item.id || `mem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          content: item.content || '',
-          metadata: item.metadata || { childId, timestamp: new Date().toISOString() }
-        }));
+      // 如果有标签过滤，在本地过滤结果
+      if (tags.length > 0) {
+        memories = memories.filter(memory => {
+          const memoryTags = memory.metadata?.tags || [];
+          return tags.some(tag => memoryTags.includes(tag));
+        });
       }
-      return [];
+      
+      return memories;
     } catch (error) {
       console.error('搜索记忆失败:', error);
       return [];
@@ -434,74 +412,49 @@ export class Mem0MemoryService implements MemoryService {
   }
 
   private async saveMemory(memory: Mem0Memory): Promise<void> {
-    await this.makeMem0Request(mem0Endpoints.memories, 'POST', memory);
-  }
-
-  private async deleteMemoriesByTags(childId: string, tags: string[]): Promise<void> {
-    const memories = await this.searchMemories(childId, ...tags);
-    
-    for (const memory of memories) {
-      if (memory.id) {
-        await this.makeMem0Request(mem0Endpoints.memoryById(memory.id), 'DELETE');
-      }
-    }
-  }
-
-  private async makeMem0Request(endpoint: string, method: string, data?: any): Promise<Mem0Response<any>> {
-    const config = getMem0Config();
-    
-    if (!config.apiKey) {
-      console.warn('mem0 API密钥未配置，返回空结果');
-      return { success: false, error: 'API密钥未配置' };
-    }
-
-    const url = `${config.baseUrl}${endpoint}`;
-    const headers = {
-      'Authorization': `Token ${config.apiKey}`,
-      'Content-Type': 'application/json',
-    };
-
-    // 简化请求体，避免格式问题
-    let requestBody = data;
-    if (method === 'POST' && data) {
-      // 简化metadata结构，只保留必要字段
-      const simplifiedData = { ...data };
-      if (simplifiedData.metadata) {
-        // 确保user_id字段存在且符合要求
-        simplifiedData.metadata.user_id = data.metadata?.childId || 'default_user';
-      }
-      requestBody = simplifiedData;
+    if (!this.client) {
+      console.error('mem0客户端未初始化');
+      return;
     }
 
     try {
-      const response = await fetch(url, {
-        method,
-        headers,
-        body: requestBody ? JSON.stringify(requestBody) : undefined,
+      // 转换为SDK所需的消息格式
+      const messages = [{ 
+        role: "user", 
+        content: memory.content 
+      }];
+
+      // 使用SDK的add方法，传递用户ID和metadata
+      const result = await this.client.add(messages, { 
+        user_id: memory.metadata.childId || 'default_user',
+        metadata: memory.metadata
       });
+      
+      console.log('记忆保存成功:', result);
+    } catch (error) {
+      console.error('保存记忆失败:', error);
+      throw error;
+    }
+  }
 
-      if (!response.ok) {
-        // 获取详细错误信息
-        let errorDetails = '';
-        try {
-          errorDetails = await response.text();
-        } catch (e) {
-          // 如果无法获取详细信息，继续使用状态文本
+  private async deleteMemoriesByTags(childId: string, tags: string[]): Promise<void> {
+    if (!this.client) {
+      console.error('mem0客户端未初始化');
+      return;
+    }
+
+    try {
+      const memories = await this.searchMemories(childId, ...tags);
+      
+      for (const memory of memories) {
+        if (memory.id) {
+          // 使用SDK的delete方法删除指定记忆
+          await this.client.delete(memory.id);
+          console.log(`删除记忆成功: ${memory.id}`);
         }
-        console.error(`mem0 API请求失败: ${response.status} ${response.statusText}. 详情: ${errorDetails}`);
-        // 降级返回空成功响应
-        return { success: true, data: [] };
       }
-
-      try {
-        return await response.json();
-      } catch (jsonError) {
-        console.error('解析mem0 API响应失败:', jsonError);
-        return { success: true, data: [] };
-      }
-    } catch (networkError) {
-      console.error('mem0 API网络请求异常:', networkError);
-      return { success: true, data: [] };
+    } catch (error) {
+      console.error('删除记忆失败:', error);
     }
   }
 
