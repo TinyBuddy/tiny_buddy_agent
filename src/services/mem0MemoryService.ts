@@ -348,7 +348,19 @@ export class Mem0MemoryService implements MemoryService {
 
   private async testConnection(): Promise<boolean> {
     try {
-      const response = await this.makeMem0Request(mem0Endpoints.agents, 'GET');
+      // 使用POST方法测试连接，通过存储一个测试记忆来验证API可用性
+      const testMemory: Mem0Memory = {
+        content: '连接测试记忆',
+        metadata: {
+          childId: 'test_connection',
+          memoryType: 'episodic',
+          timestamp: new Date().toISOString(),
+          tags: ['connection_test'],
+          importance: 0.1,
+        },
+      };
+      
+      const response = await this.makeMem0Request(mem0Endpoints.memories, 'POST', testMemory);
       return response.success;
     } catch (error) {
       console.error('mem0连接测试失败:', error);
@@ -357,18 +369,23 @@ export class Mem0MemoryService implements MemoryService {
   }
 
   private async searchMemories(childId: string, ...tags: string[]): Promise<Mem0Memory[]> {
-    const queryParams = new URLSearchParams();
-    if (childId !== '*') {
-      queryParams.append('childId', childId);
+    try {
+      // 使用POST方法进行记忆搜索，支持更复杂的查询条件
+      const searchData = {
+        query: '', // 空查询返回所有匹配的记忆
+        filters: {
+          childId: childId !== '*' ? childId : undefined,
+          tags: tags.length > 0 ? tags : undefined,
+        },
+        limit: 100, // 限制返回结果数量
+      };
+      
+      const response = await this.makeMem0Request(mem0Endpoints.search, 'POST', searchData);
+      return response.data || [];
+    } catch (error) {
+      console.error('搜索记忆失败:', error);
+      return [];
     }
-    tags.forEach(tag => queryParams.append('tags', tag));
-    
-    const response = await this.makeMem0Request(
-      `${mem0Endpoints.search}?${queryParams.toString()}`,
-      'GET'
-    );
-    
-    return response.data || [];
   }
 
   private async saveMemory(memory: Mem0Memory): Promise<void> {
@@ -398,10 +415,24 @@ export class Mem0MemoryService implements MemoryService {
       'Content-Type': 'application/json',
     };
 
+    // 为POST请求添加必要的过滤器参数
+    let requestBody = data;
+    if (method === 'POST' && data) {
+      requestBody = {
+        ...data,
+        metadata: {
+          ...data.metadata,
+          // mem0 API要求的过滤器参数
+          app_id: 'tiny_buddy_agent',
+          user_id: data.metadata?.childId || 'default_user',
+        },
+      };
+    }
+
     const response = await fetch(url, {
       method,
       headers,
-      body: data ? JSON.stringify(data) : undefined,
+      body: requestBody ? JSON.stringify(requestBody) : undefined,
     });
 
     if (!response.ok) {

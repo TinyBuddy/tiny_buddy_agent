@@ -91,6 +91,9 @@ export class Mem0ApiService implements Mem0Service {
             ...metadata,
             childId,
             timestamp: new Date().toISOString(),
+            // mem0 API要求的过滤器参数
+            app_id: 'tiny_buddy_agent',
+            user_id: childId,
           },
         }),
       });
@@ -229,11 +232,20 @@ export class Mem0ApiService implements Mem0Service {
     }
     
     try {
-      const response = await fetch(`${this.baseUrl}/v1/memories?childId=${childId}&limit=${limit}`, {
-        method: 'GET',
+      // 使用POST方法搜索特定儿童的所有记忆
+      const response = await fetch(`${this.baseUrl}/v1/memories/search`, {
+        method: 'POST',
         headers: {
           'Authorization': `Token ${this.apiKey}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          query: '', // 空查询返回所有记忆
+          filters: {
+            childId,
+          },
+          limit,
+        }),
       });
       
       if (!response.ok) {
