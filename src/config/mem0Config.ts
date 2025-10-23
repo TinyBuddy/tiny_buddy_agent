@@ -59,5 +59,5 @@ export const memoryTypeMapping = {
 export const mem0Endpoints = {
   memories: '/v1/memories',
   memoryById: (id: string) => `/v1/memories/${id}`,
-  search: '/v2/memories/search',
+  search: '/v2/memories/search/',
 } as const;
