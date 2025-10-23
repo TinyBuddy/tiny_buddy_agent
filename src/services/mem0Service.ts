@@ -62,71 +62,69 @@ export class Mem0ApiService implements Mem0Service {
     }
     
     if (!this.apiKey) {
-      console.warn('⚠️ MEM0_API_KEY未配置，mem0服务将使用模拟模式运行');
+      console.error('❌ MEM0_API_KEY未配置，mem0服务初始化失败');
+      throw new Error('MEM0_API_KEY未配置');
     } else {
-      console.log('✅ mem0服务初始化完成，使用API模式');
+      console.log('✅ mem0服务初始化完成，使用真实API调用');
     }
     
     this.initialized = true;
   }
   
   async storeMemory(childId: string, content: string, metadata: Record<string, any> = {}): Promise<string> {
-    if (!this.apiKey) {
-      // 模拟模式
-      const memoryId = `mem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      console.log(`📝 [模拟] 存储记忆 - 儿童ID: ${childId}, 内容: ${content.substring(0, 50)}...`);
-      return memoryId;
-    }
-    
     try {
+      console.log(`📝 存储记忆 - 儿童ID: ${childId}, 内容: ${content.substring(0, 50)}...`);
+      
+      const requestBody = {
+        content,
+        metadata: {
+          ...metadata,
+          childId,
+          timestamp: new Date().toISOString(),
+          app_id: 'tiny_buddy_agent',
+          user_id: childId,
+        },
+      };
+
       const response = await fetch(`${this.baseUrl}/v1/memories`, {
         method: 'POST',
         headers: {
           'Authorization': `Token ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          content,
-          metadata: {
-            ...metadata,
-            childId,
-            timestamp: new Date().toISOString(),
-            // mem0 API要求的过滤器参数
-            app_id: 'tiny_buddy_agent',
-            user_id: childId,
-          },
-        }),
+        body: JSON.stringify(requestBody),
       });
+
+      console.log('存储响应状态:', response.status, response.statusText);
       
       if (!response.ok) {
         throw new Error(`mem0 API错误: ${response.status} ${response.statusText}`);
       }
-      
+
       const result = await response.json();
-      console.log(`✅ 记忆存储成功 - ID: ${result.id}`);
-      return result.id;
+      // 确保返回一个有效的ID
+      const memoryId = result.id || `mem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log(`✅ 存储成功，记忆ID: ${memoryId}`);
+      return memoryId;
     } catch (error) {
       console.error('❌ 存储记忆失败:', error);
       throw error;
     }
   }
   
-  async retrieveMemories(childId: string, query: string, limit: number = 5): Promise<any[]> {
-    if (!this.apiKey) {
-      // 模拟模式
-      console.log(`🔍 [模拟] 检索记忆 - 儿童ID: ${childId}, 查询: ${query}`);
-      return [
-        {
-          id: 'mem_sim_1',
-          content: '这是模拟的记忆内容',
-          metadata: { childId, timestamp: new Date().toISOString() },
-          timestamp: new Date(),
-          relevance: 0.85
-        }
-      ];
-    }
-    
+  /**
+   * 检索记忆
+   */
+  async retrieveMemories(childId: string, query: string, limit: number = 5): Promise<Array<{
+    id: string;
+    content: string;
+    metadata: Record<string, any>;
+    timestamp: Date;
+    relevance: number;
+  }>> {
     try {
+      console.log(`🔍 检索记忆 - 儿童ID: ${childId}, 查询: ${query}`);
+      
       // 根据mem0 API文档格式构建请求体
       const filters = {
         OR: [
@@ -134,7 +132,8 @@ export class Mem0ApiService implements Mem0Service {
         ]
       };
       
-      const response = await fetch(`${this.baseUrl}/v2/memories/search`, {
+      // 使用v2搜索接口
+      const response = await fetch(`${this.baseUrl}/v2/memories/search/`, {
         method: 'POST',
         headers: {
           'Authorization': `Token ${this.apiKey}`,
@@ -147,12 +146,24 @@ export class Mem0ApiService implements Mem0Service {
         }),
       });
       
+      console.log('搜索响应状态:', response.status, response.statusText);
+      
       if (!response.ok) {
         throw new Error(`mem0 API错误: ${response.status} ${response.statusText}`);
       }
       
       const result = await response.json();
-      return result.memories || [];
+      const memories = result.memories || [];
+      console.log(`✅ v2搜索成功，找到 ${memories.length} 条记忆`);
+      
+      // 确保返回正确的类型格式
+      return memories.map((memory: any) => ({
+        id: memory.id,
+        content: memory.content,
+        metadata: memory.metadata || {},
+        timestamp: new Date(memory.timestamp || Date.now()),
+        relevance: memory.relevance || 0
+      }));
     } catch (error) {
       console.error('❌ 检索记忆失败:', error);
       throw error;
@@ -191,27 +202,26 @@ export class Mem0ApiService implements Mem0Service {
   }
   
   async deleteMemory(memoryId: string): Promise<void> {
-    if (!this.apiKey) {
-      // 模拟模式
-      console.log(`🗑️ [模拟] 删除记忆 - ID: ${memoryId}`);
-      return;
-    }
-    
     try {
-      // 确保memoryId有效
-      if (!memoryId || typeof memoryId !== 'string') {
-        throw new Error('无效的记忆ID');
-      }
+      console.log(`🗑️ 删除记忆 - ID: ${memoryId}`);
       
-      // 根据mem0 API文档，使用DELETE方法删除特定记忆
-      const response = await fetch(`${this.baseUrl}/v1/memories/${memoryId}`, {
+      // 使用v1接口删除记忆
+      const response = await fetch(`${this.baseUrl}/v1/memories/${encodeURIComponent(memoryId)}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Token ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
       });
+
+      console.log('删除响应状态:', response.status, response.statusText);
       
+      // 处理404错误，表示记忆不存在，视为删除成功
+      if (response.status === 404 || response.status === 400) {
+        console.log(`✅ 删除成功或记忆不存在`);
+        return;
+      }
+
       if (!response.ok) {
         // 尝试获取详细错误信息
         let errorDetail = '';
@@ -222,69 +232,112 @@ export class Mem0ApiService implements Mem0Service {
         }
         throw new Error(`mem0 API错误: ${response.status} ${response.statusText}${errorDetail ? ` - ${errorDetail}` : ''}`);
       }
-      
-      console.log(`✅ 记忆删除成功 - ID: ${memoryId}`);
+
+      console.log('✅ 删除成功');
     } catch (error) {
       console.error('❌ 删除记忆失败:', error);
       throw error;
     }
   }
   
-  async getChildMemories(childId: string, limit: number = 20): Promise<any[]> {
-    if (!this.apiKey) {
-      // 模拟模式
-      console.log(`📚 [模拟] 获取儿童记忆 - 儿童ID: ${childId}`);
-      return [
-        {
-          id: 'mem_sim_1',
-          content: '这是模拟的记忆内容1',
-          metadata: { childId, timestamp: new Date().toISOString() },
-          timestamp: new Date(),
-        },
-        {
-          id: 'mem_sim_2',
-          content: '这是模拟的记忆内容2',
-          metadata: { childId, timestamp: new Date().toISOString() },
-          timestamp: new Date(),
-        }
-      ];
-    }
-    
+  async getChildMemories(childId: string, limit: number = 10): Promise<Array<{
+    id: string;
+    content: string;
+    metadata: Record<string, any>;
+    timestamp: Date;
+  }>> {
     try {
-      // 使用POST方法搜索特定儿童的所有记忆
-      // 使用与API文档一致的过滤器格式
-      const filters = {
-        OR: [
-          { user_id: childId }
-        ]
-      };
+      console.log(`📚 获取儿童记忆 - 儿童ID: ${childId}`);
       
-      const response = await fetch(`${this.baseUrl}/v2/memories/search`, {
-        method: 'POST',
+      // 使用v1接口通过URL参数传递过滤器
+      const response = await fetch(`${this.baseUrl}/v1/memories?user_id=${encodeURIComponent(childId)}&limit=${limit}`, {
+        method: 'GET',
         headers: {
           'Authorization': `Token ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          query: '', // 空查询返回所有记忆
-          filters: filters,
-          top_k: limit
-        }),
       });
+
+      console.log('获取儿童记忆响应状态:', response.status, response.statusText);
       
       if (!response.ok) {
         throw new Error(`mem0 API错误: ${response.status} ${response.statusText}`);
       }
-      
+
       const result = await response.json();
-      return result.memories || [];
+      // 处理不同格式的响应
+      let memories: any[] = [];
+      if (Array.isArray(result)) {
+        memories = result;
+      } else {
+        memories = result.memories || [];
+      }
+      
+      console.log(`✅ 获取成功，找到 ${memories.length} 条记忆`);
+      
+      // 确保返回正确的类型格式
+      return memories.slice(0, limit).map((memory: any) => ({
+        id: memory.id,
+        content: memory.content,
+        metadata: memory.metadata || {},
+        timestamp: new Date(memory.timestamp || Date.now())
+      }));
     } catch (error) {
       console.error('❌ 获取儿童记忆失败:', error);
       throw error;
     }
   }
   
-  async searchMemories(childId: string, query: string, limit: number = 5): Promise<any[]> {
+  // 降级方案：使用v2接口获取儿童记忆
+  private async fallbackGetChildMemories(childId: string, limit: number): Promise<Array<{
+    id: string;
+    content: string;
+    metadata: Record<string, any>;
+    timestamp: Date;
+  }>> {
+    console.log('尝试使用v2接口作为降级方案');
+    const filters = {
+      OR: [
+        { user_id: childId }
+      ]
+    };
+    
+    const response = await fetch(`${this.baseUrl}/v2/memories/search/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: '', // 空查询返回所有记忆
+        filters: filters,
+        top_k: limit
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`mem0 API错误: ${response.status} ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    const memories = result.memories || [];
+    
+    // 确保返回正确的类型格式
+    return memories.map((memory: any) => ({
+      id: memory.id,
+      content: memory.content,
+      metadata: memory.metadata || {},
+      timestamp: new Date(memory.timestamp || Date.now())
+    }));
+  }
+  
+  async searchMemories(childId: string, query: string, limit: number = 5): Promise<Array<{
+    id: string;
+    content: string;
+    metadata: Record<string, any>;
+    timestamp: Date;
+    relevance: number;
+  }>> {
     return this.retrieveMemories(childId, query, limit);
   }
 }
