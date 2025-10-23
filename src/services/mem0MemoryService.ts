@@ -1,13 +1,13 @@
-// mem0开源记忆库服务实现
+// mem0 Open Source Memory Service Implementation
 import type { MemoryService } from './memoryService';
 import type { ChildProfile } from '../models/childProfile';
 import type { Message } from '../models/message';
 import { getMem0Config, isMem0Available } from '../config/mem0Config';
 
-// 导入mem0 SDK
+// Import mem0 SDK
 import MemoryClient from 'mem0ai';
 
-// mem0记忆数据结构
+// mem0 Memory Data Structure
 interface Mem0Memory {
   id?: string;
   content: string;
@@ -39,25 +39,25 @@ export class Mem0MemoryService implements MemoryService {
     }
 
     if (!isMem0Available()) {
-      console.warn('mem0不可用，检查配置或API密钥');
+      console.warn('mem0 not available, check configuration or API key');
       this.initialized = true;
       return;
     }
 
     try {
-      // 初始化mem0 SDK客户端
+      // Initialize mem0 SDK client
       this.client = new MemoryClient({ apiKey: this.config.apiKey! });
-      console.log('mem0 SDK客户端初始化成功');
+      console.log('mem0 SDK client initialized successfully');
       
-      // 简单测试连接
+      // Simple connection test
       try {
-        // 使用SDK的简单操作测试连接
-        console.log('mem0连接测试成功');
+        // Use SDK simple operation to test connection
+        console.log('mem0 connection test successful');
       } catch (testError) {
-        console.warn('mem0连接测试失败，服务将以降级模式运行:', testError);
+        console.warn('mem0 connection test failed, service will run in degraded mode:', testError);
       }
     } catch (error) {
-      console.error('mem0记忆服务初始化失败:', error);
+      console.error('mem0 memory service initialization failed:', error);
     }
 
     this.initialized = true;
@@ -67,24 +67,24 @@ export class Mem0MemoryService implements MemoryService {
     await this.ensureInitialized();
     
     if (!isMem0Available()) {
-      throw new Error('mem0不可用，无法获取儿童档案');
+      throw new Error('mem0 not available, cannot get child profile');
     }
 
     try {
-      // 从mem0获取儿童档案记忆
+      // Get child profile memory from mem0
       const memories = await this.searchMemories(childId, 'child_profile');
       
       if (memories.length > 0) {
-        // 解析最新的儿童档案记忆
+        // Parse the latest child profile memory
         const latestMemory = memories[0];
         return this.parseChildProfileFromMemory(latestMemory);
       }
       
-      // 如果没有找到，创建默认档案
+      // If not found, create default profile
       return this.createDefaultChildProfile(childId);
     } catch (error) {
-      console.error('从mem0获取儿童档案失败:', error);
-      throw new Error(`获取儿童档案失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      console.error('Failed to get child profile from mem0:', error);
+      throw new Error(`Failed to get child profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -92,22 +92,22 @@ export class Mem0MemoryService implements MemoryService {
     await this.ensureInitialized();
     
     if (!isMem0Available()) {
-      throw new Error('mem0不可用，无法更新儿童档案');
+      throw new Error('mem0 not available, cannot update child profile');
     }
 
     try {
-      // 获取当前档案
+      // Get current profile
       const currentProfile = await this.getChildProfile(childId);
       const updatedProfile = { ...currentProfile, ...profile, lastInteraction: new Date() };
       
-      // 保存到mem0
+      // Save to mem0
       await this.saveChildProfileToMem0(childId, updatedProfile);
       
-      console.log(`儿童档案已更新到mem0: ${childId}`);
+      console.log(`Child profile updated in mem0: ${childId}`);
       return updatedProfile;
     } catch (error) {
-      console.error('更新儿童档案到mem0失败:', error);
-      throw new Error(`更新儿童档案失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      console.error('Failed to update child profile in mem0:', error);
+      throw new Error(`Failed to update child profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -115,7 +115,7 @@ export class Mem0MemoryService implements MemoryService {
     await this.ensureInitialized();
     
     if (!isMem0Available()) {
-      throw new Error('mem0不可用，无法创建儿童档案');
+      throw new Error('mem0 not available, cannot create child profile');
     }
 
     try {
@@ -126,14 +126,14 @@ export class Mem0MemoryService implements MemoryService {
         lastInteraction: new Date(),
       };
       
-      // 保存到mem0
+      // Save to mem0
       await this.saveChildProfileToMem0(childId, newProfile);
       
-      console.log(`儿童档案已创建并保存到mem0: ${childId}`);
+      console.log(`Child profile created and saved to mem0: ${childId}`);
       return newProfile;
     } catch (error) {
-      console.error('创建儿童档案到mem0失败:', error);
-      throw new Error(`创建儿童档案失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      console.error('Failed to create child profile in mem0:', error);
+      throw new Error(`Failed to create child profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -141,17 +141,17 @@ export class Mem0MemoryService implements MemoryService {
     await this.ensureInitialized();
     
     if (!isMem0Available()) {
-      return []; // 返回空数组而不是抛出错误
+      return []; // Return empty array instead of throwing error
     }
 
     try {
-      // 从mem0获取对话历史记忆
+      // Get conversation history memories from mem0
       const memories = await this.searchMemories(childId, 'conversation');
       
       return memories.map(memory => this.parseMessageFromMemory(memory));
     } catch (error) {
-      console.error('从mem0获取对话历史失败:', error);
-      return []; // 降级处理，返回空数组
+      console.error('Failed to get conversation history from mem0:', error);
+      return []; // Degraded handling, return empty array
     }
   }
 
@@ -159,20 +159,20 @@ export class Mem0MemoryService implements MemoryService {
     await this.ensureInitialized();
     
     if (!isMem0Available()) {
-      return; // 静默失败
+      return; // Silent failure
     }
 
     try {
-      // 保存消息到mem0
+      // Save message to mem0
       await this.saveMessageToMem0(childId, message);
       
-      // 如果是用户消息，更新最后互动时间
+      // If it's a user message, update last interaction time
       if (message.type === 'user') {
         await this.updateChildProfile(childId, { lastInteraction: new Date() });
       }
     } catch (error) {
-      console.error('保存消息到mem0失败:', error);
-      // 静默失败，不影响主流程
+      console.error('Failed to save message to mem0:', error);
+      // Silent failure, doesn't affect main flow
     }
   }
 
@@ -180,15 +180,15 @@ export class Mem0MemoryService implements MemoryService {
     await this.ensureInitialized();
     
     if (!isMem0Available()) {
-      return; // 静默失败
+      return; // Silent failure
     }
 
     try {
-      // 删除该儿童的所有对话记忆
+      // Delete all conversation memories for this child
       await this.deleteMemoriesByTags(childId, ['conversation']);
-      console.log(`已清空儿童对话历史: ${childId}`);
+      console.log(`Child conversation history cleared: ${childId}`);
     } catch (error) {
-      console.error('清空对话历史失败:', error);
+      console.error('Failed to clear conversation history:', error);
     }
   }
 
@@ -196,27 +196,27 @@ export class Mem0MemoryService implements MemoryService {
     await this.ensureInitialized();
     
     if (!isMem0Available()) {
-      return []; // 返回空数组
+      return []; // Return empty array
     }
 
     try {
-      // 从mem0获取儿童的相关记忆进行分析
+      // Get child's relevant memories from mem0 for analysis
       const memories = await this.searchMemories(childId, 'interest_analysis');
       
-      // 简单的兴趣分析逻辑
+      // Simple interest analysis logic
       const interests: Set<string> = new Set();
       
       for (const memory of memories) {
-        // 分析记忆内容中的关键词
+        // Analyze keywords in memory content
         const content = memory.content.toLowerCase();
         
-        // 预设的兴趣关键词
+        // Preset interest keywords
         const interestKeywords = {
-          '动物': ['猫', '狗', '兔子', '动物', 'pet', 'animal'],
-          '音乐': ['唱歌', '音乐', '歌', 'music', 'song'],
-          '游戏': ['游戏', '玩', 'game', 'play'],
-          '故事': ['故事', '书', 'story', 'book'],
-          '科学': ['为什么', '怎么', 'what', 'why', 'how'],
+          'animals': ['cat', 'dog', 'rabbit', 'animal', 'pet'],
+          'music': ['sing', 'music', 'song'],
+          'games': ['game', 'play'],
+          'stories': ['story', 'book'],
+          'science': ['what', 'why', 'how'],
         };
         
         for (const [interest, keywords] of Object.entries(interestKeywords)) {
@@ -228,7 +228,7 @@ export class Mem0MemoryService implements MemoryService {
       
       return Array.from(interests);
     } catch (error) {
-      console.error('分析儿童兴趣失败:', error);
+      console.error('Failed to analyze child interests:', error);
       return [];
     }
   }
@@ -237,13 +237,13 @@ export class Mem0MemoryService implements MemoryService {
     await this.ensureInitialized();
     
     if (!isMem0Available()) {
-      return; // 静默失败
+      return; // Silent failure
     }
 
     try {
-      // 保存学习进度到mem0
+      // Save learning progress to mem0
       const memory: Mem0Memory = {
-        content: `学习进度更新: ${knowledgePoint} - ${progress}%`,
+        content: `Learning progress update: ${knowledgePoint} - ${progress}%`,
         metadata: {
           childId,
           memoryType: 'procedural',
@@ -254,9 +254,9 @@ export class Mem0MemoryService implements MemoryService {
       };
       
       await this.saveMemory(memory);
-      console.log(`学习进度已保存到mem0: ${knowledgePoint}`);
+      console.log(`Learning progress saved to mem0: ${knowledgePoint}`);
     } catch (error) {
-      console.error('保存学习进度到mem0失败:', error);
+      console.error('Failed to save learning progress to mem0:', error);
     }
   }
 
@@ -280,7 +280,7 @@ export class Mem0MemoryService implements MemoryService {
       
       return null;
     } catch (error) {
-      console.error('获取规划结果失败:', error);
+      console.error('Failed to get planning result:', error);
       return null;
     }
   }
@@ -289,7 +289,7 @@ export class Mem0MemoryService implements MemoryService {
     await this.ensureInitialized();
     
     if (!isMem0Available()) {
-      return; // 静默失败
+      return; // Silent failure
     }
 
     try {
@@ -305,9 +305,9 @@ export class Mem0MemoryService implements MemoryService {
       };
       
       await this.saveMemory(memory);
-      console.log('规划结果已保存到mem0');
+      console.log('Planning result saved to mem0');
     } catch (error) {
-      console.error('保存规划结果到mem0失败:', error);
+      console.error('Failed to save planning result to mem0:', error);
     }
   }
 
@@ -315,17 +315,17 @@ export class Mem0MemoryService implements MemoryService {
     await this.ensureInitialized();
     
     if (!isMem0Available()) {
-      return; // 静默失败
+      return; // Silent failure
     }
 
     try {
-      // 先删除旧的规划结果
+      // First delete old planning result
       await this.deleteMemoriesByTags(childId, ['planning_result']);
       
-      // 保存新的规划结果
+      // Save new planning result
       await this.setPlanningResult(childId, plan);
     } catch (error) {
-      console.error('更新规划结果失败:', error);
+      console.error('Failed to update planning result:', error);
     }
   }
 
@@ -333,13 +333,13 @@ export class Mem0MemoryService implements MemoryService {
     await this.ensureInitialized();
     
     if (!isMem0Available()) {
-      return []; // 返回空数组
+      return []; // Return empty array
     }
 
     try {
-      console.log('获取所有儿童ID');
+      console.log('Getting all child IDs');
       
-      // 简化搜索，避免使用通配符可能导致的问题
+      // Simplified search to avoid issues with wildcards
       const memories = await this.searchMemories('default_user', 'child_profile');
       
       const childIds = new Set<string>();
@@ -349,16 +349,16 @@ export class Mem0MemoryService implements MemoryService {
         }
       }
       
-      console.log(`找到 ${childIds.size} 个儿童ID`);
+      console.log(`Found ${childIds.size} child IDs`);
       return Array.from(childIds);
     } catch (error) {
-      console.error('获取所有儿童ID失败:', error);
+      console.error('Failed to get all child IDs:', error);
       return [];
     }
   }
 
-  // ========== mem0 SDK交互方法 ==========
-  // 测试连接的功能已集成到init方法中，使用SDK进行初始化和测试
+  // ========== mem0 SDK Interaction Methods ==========
+  // Connection testing functionality is integrated into the init method, using SDK for initialization and testing
 
   private async searchMemories(childId: string, ...tags: string[]): Promise<Mem0Memory[]> {
     if (!this.client) {
@@ -367,36 +367,30 @@ export class Mem0MemoryService implements MemoryService {
     }
 
     try {
-      console.log(`搜索记忆 - 儿童ID: ${childId}, 标签: ${tags.join(', ')}`);
+      console.log(`Searching memories - Child ID: ${childId}, Tags: ${tags.join(', ')}`);
       
-      // 使用SDK的search方法
+      // Using SDK search method
       const queryText = childId !== '*' ? childId : 'default_query';
       const userId = childId !== '*' ? childId : 'default_user';
       
-      // 构建filters参数
-      const filters = {
-        OR: [
-          { user_id: userId },
-          { metadata: { tags: { in: tags } } }
-        ]
+      // Use simpler filters without unsupported operations
+      const searchParams = {
+        user_id: userId
       };
       
-      // 使用SDK搜索，包含filters参数
-      const results = await this.client.search(queryText, {
-        api_version: "v2",
-        filters
-      });
+      // Search using SDK
+      const results = await this.client.search(queryText, searchParams);
       
-      console.log(`搜索完成，找到 ${results.length} 条记忆`);
+      console.log(`Search completed, found ${results.length} memories`);
       
-      // 转换结果格式
+      // Convert result format
       let memories = results.map((item: any) => ({
         id: item.id || `mem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         content: item.content || '',
         metadata: item.metadata || { childId: userId, timestamp: new Date().toISOString() }
       }));
       
-      // 如果有标签过滤，在本地过滤结果
+      // If tags are provided, filter results locally
       if (tags.length > 0) {
         memories = memories.filter(memory => {
           const memoryTags = memory.metadata?.tags || [];
@@ -406,40 +400,40 @@ export class Mem0MemoryService implements MemoryService {
       
       return memories;
     } catch (error) {
-      console.error('搜索记忆失败:', error);
+      console.error('Failed to search memories:', error);
       return [];
     }
   }
 
   private async saveMemory(memory: Mem0Memory): Promise<void> {
     if (!this.client) {
-      console.error('mem0客户端未初始化');
+      console.error('mem0 client not initialized');
       return;
     }
 
     try {
-      // 转换为SDK所需的消息格式
+      // Convert to message format required by SDK
       const messages = [{ 
         role: "user", 
         content: memory.content 
       }];
 
-      // 使用SDK的add方法，传递用户ID和metadata
+      // Use SDK add method, passing user ID and metadata
       const result = await this.client.add(messages, { 
         user_id: memory.metadata.childId || 'default_user',
         metadata: memory.metadata
       });
       
-      console.log('记忆保存成功:', result);
+      console.log('Memory saved successfully:', result);
     } catch (error) {
-      console.error('保存记忆失败:', error);
+      console.error('Failed to save memory:', error);
       throw error;
     }
   }
 
   private async deleteMemoriesByTags(childId: string, tags: string[]): Promise<void> {
     if (!this.client) {
-      console.error('mem0客户端未初始化');
+      console.error('mem0 client not initialized');
       return;
     }
 
@@ -448,23 +442,23 @@ export class Mem0MemoryService implements MemoryService {
       
       for (const memory of memories) {
         if (memory.id) {
-          // 使用SDK的delete方法删除指定记忆
+          // Use SDK delete method to delete specified memory
           await this.client.delete(memory.id);
-          console.log(`删除记忆成功: ${memory.id}`);
+          console.log(`Memory deleted successfully: ${memory.id}`);
         }
       }
     } catch (error) {
-      console.error('删除记忆失败:', error);
+      console.error('Failed to delete memories:', error);
     }
   }
 
-  // ========== 辅助方法 ==========
+  // ========== Helper Methods ==========
 
   private parseChildProfileFromMemory(memory: Mem0Memory): ChildProfile {
     try {
       return JSON.parse(memory.content);
     } catch (error) {
-      throw new Error('解析儿童档案记忆失败');
+      throw new Error('Failed to parse child profile memory');
     }
   }
 
@@ -472,7 +466,7 @@ export class Mem0MemoryService implements MemoryService {
     try {
       return JSON.parse(memory.content);
     } catch (error) {
-      throw new Error('解析消息记忆失败');
+      throw new Error('Failed to parse message memory');
     }
   }
 
