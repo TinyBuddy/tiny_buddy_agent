@@ -377,39 +377,28 @@ export class Mem0MemoryService implements MemoryService {
     try {
       console.log(`搜索记忆 - 儿童ID: ${childId}, 标签: ${tags.join(', ')}`);
       
-      // 根据错误信息，mem0 API要求filters参数不能为空
-      // 构建符合API要求的filters结构
+      // 构建有效的查询文本，确保query字段不为空
+      const queryText = childId !== '*' ? childId : 'default_query';
+      
+      // 简化filters结构，移除不支持的in操作符
+      // 使用最简单的格式，只保留user_id过滤
       const filters: any = {
         AND: [
           { 
-            metadata: {
-              user_id: { 
-                eq: childId !== '*' ? childId : 'default_user' 
-              } 
+            metadata: { 
+              user_id: childId !== '*' ? childId : 'default_user' 
             } 
           }
         ]
       };
       
-      // 如果有标签，添加标签过滤条件
-      if (tags.length > 0) {
-        filters.AND.push({
-          metadata: {
-            tags: {
-              in: tags
-            }
-          }
-        });
-      }
+      // 不使用复杂的标签过滤，避免操作符错误
       
-      // 构建完整的搜索请求体，包含API要求的所有字段
+      // 构建简化的搜索请求体
       const searchData = {
-        query: '', // 空查询配合filters使用
+        query: queryText, // 确保query不为空
         filters: filters, // 确保filters不为空
         top_k: 100, // 限制返回结果数量
-        metadata: {
-          user_id: childId !== '*' ? childId : 'default_user'
-        }
       };
       
       console.log('构建的搜索请求体:', JSON.stringify(searchData, null, 2));
@@ -420,12 +409,22 @@ export class Mem0MemoryService implements MemoryService {
       const result = response.data || [];
       if (Array.isArray(result)) {
         // 过滤并转换结果格式
-        return result.filter(item => item && typeof item === 'object')
-          .map(item => ({
-            id: item.id || `mem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            content: item.content || '',
-            metadata: item.metadata || { childId, timestamp: new Date().toISOString() }
-          }));
+        const filteredResults = result.filter(item => item && typeof item === 'object');
+        
+        // 如果有标签过滤，在本地过滤结果（API不支持in操作符）
+        let finalResults = filteredResults;
+        if (tags.length > 0) {
+          finalResults = filteredResults.filter(item => {
+            const itemTags = item.metadata?.tags || [];
+            return tags.some(tag => itemTags.includes(tag));
+          });
+        }
+        
+        return finalResults.map(item => ({
+          id: item.id || `mem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          content: item.content || '',
+          metadata: item.metadata || { childId, timestamp: new Date().toISOString() }
+        }));
       }
       return [];
     } catch (error) {
