@@ -127,7 +127,7 @@ export class Mem0ApiService implements Mem0Service {
     }
     
     try {
-      const response = await fetch(`${this.baseUrl}/v1/memories/search`, {
+      const response = await fetch(`${this.baseUrl}/v2/memories/search`, {
         method: 'POST',
         headers: {
           'Authorization': `Token ${this.apiKey}`,
@@ -136,9 +136,11 @@ export class Mem0ApiService implements Mem0Service {
         body: JSON.stringify({
           query,
           filters: {
-            childId,
+            user_id: childId,
+            app_id: 'tiny_buddy_agent'
           },
-          limit,
+          top_k: limit,
+          version: 'v2'
         }),
       });
       
@@ -233,7 +235,7 @@ export class Mem0ApiService implements Mem0Service {
     
     try {
       // 使用POST方法搜索特定儿童的所有记忆
-      const response = await fetch(`${this.baseUrl}/v1/memories/search`, {
+      const response = await fetch(`${this.baseUrl}/v2/memories/search`, {
         method: 'POST',
         headers: {
           'Authorization': `Token ${this.apiKey}`,
@@ -242,9 +244,11 @@ export class Mem0ApiService implements Mem0Service {
         body: JSON.stringify({
           query: '', // 空查询返回所有记忆
           filters: {
-            childId,
+            user_id: childId,
+            app_id: 'tiny_buddy_agent'
           },
-          limit,
+          top_k: limit,
+          version: 'v2'
         }),
       });
       
