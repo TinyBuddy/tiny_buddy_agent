@@ -1,13 +1,33 @@
 import { and, eq, gte, lte } from "drizzle-orm";
 // 使用Next.js框架创建HTTP服务器
 import express from "express";
-import { z } from "zod";
+import { z, ZodError } from "zod";
 import { db } from "./db/db";
 import { vocabulary } from "./db/schema";
+import { PlanningAgent } from "./actors/planningAgent";
+import { InMemoryMemoryService } from "./services/memoryService";
+import { InMemoryKnowledgeBaseService } from "./services/inMemoryKnowledgeBaseService";
+import { createDefaultChildProfile } from "./models/childProfile";
+import { createMessage } from "./models/message";
+import { getFullSystemPrompt } from "./config/agentConfig";
 
 // 创建Express应用（集成Next.js功能）
 const app = express();
 app.use(express.json());
+
+// 定义请求体参数验证模式
+const generatePromptSchema = z.object({
+  childID: z.string(),
+  gender: z.enum(["male", "female", "other"]),
+  interests: z.array(z.string()),
+  languageLevel: z.string().regex(/^L[1-5]$/i),
+  historyMsgs: z.array(
+    z.object({
+      child: z.string(),
+      AI: z.string(),
+    })
+  ),
+});
 
 // 定义查询参数验证模式
 const querySchema = z.object({
@@ -91,6 +111,146 @@ app.get("/api/vocabulary", async (req, res) => {
 	}
 });
 
+// 全局服务实例，避免每次请求都重新创建
+let globalMemoryService: InMemoryMemoryService | null = null;
+let globalKnowledgeBaseService: InMemoryKnowledgeBaseService | null = null;
+
+// 初始化全局服务
+const initGlobalServices = async () => {
+  if (!globalMemoryService) {
+    globalMemoryService = new InMemoryMemoryService();
+    await globalMemoryService.init();
+  }
+  if (!globalKnowledgeBaseService) {
+    globalKnowledgeBaseService = new InMemoryKnowledgeBaseService();
+    await globalKnowledgeBaseService.init();
+  }
+  return { memoryService: globalMemoryService, knowledgeBaseService: globalKnowledgeBaseService };
+};
+
+/**
+ * 生成prompt内容的API端点
+ */
+app.post("/api/agent/generate-prompt", async (req, res) => {
+  try {
+    const startTime = Date.now();
+    
+    // 验证请求参数
+    const { childID, gender, interests, languageLevel, historyMsgs } = generatePromptSchema.parse(req.body);
+    
+    console.log(`生成prompt请求: 儿童ID=${childID}, 语言级别=${languageLevel}`);
+    
+    // 使用全局服务实例
+    const { memoryService, knowledgeBaseService } = await initGlobalServices();
+    
+    // 创建儿童档案
+    const childProfile = {
+      ...createDefaultChildProfile(childID),
+      id: childID,
+      name: childID, // 使用ID作为名称
+      gender,
+      interests,
+      languageLevel: languageLevel.toUpperCase(),
+    };
+    
+    // 转换历史消息格式
+    const conversationHistory = historyMsgs.flatMap((msg: { child: string; AI: string }) => [
+      createMessage({
+        type: "user",
+        content: msg.child,
+        sender: childID,
+      }),
+      createMessage({
+        type: "agent",
+        content: msg.AI,
+        sender: "assistant",
+      }),
+    ]);
+    
+    // 获取最后一条儿童消息作为输入
+    const lastChildMessage = historyMsgs.length > 0 ? historyMsgs[historyMsgs.length - 1].child : "Hello";
+    
+    // 直接生成简单的规划结果，避免调用PlanningAgent
+    const parsedPlanResult = {
+      type: "plan",
+      interactionType: "chat",
+      objectives: ["Build emotional connection", "Encourage expression"],
+      strategy: `Chat with ${childID} as a friend, using simple and easy-to-understand language, maintaining a positive and encouraging tone. Focus on topics like ${interests.join(', ').replace(/, ([^,]*)$/, ' and $1')}.`
+    };
+    
+    console.log(`生成规划时间: ${Date.now() - startTime}ms`);
+    
+    // 实现简化版的prompt生成函数
+    const generatePrompt = (message: string) => {
+      const recentMessages = conversationHistory.slice(-5); // 获取最近5条消息
+      const chatHistory = recentMessages
+        .map((m) => `${m.type === "user" ? "Child" : "Sparky"}: ${m.content}`)
+        .join("\n");
+
+      // 从全局配置获取系统提示词
+      let systemPrompt = getFullSystemPrompt(childProfile);
+
+      // 添加教学策略
+      systemPrompt += `\n\nTeaching strategy for this interaction: ${parsedPlanResult.strategy}\n`;
+
+      // 构建完整的prompt
+      const prompt = `
+${systemPrompt}
+
+
+Child: ${message}
+
+Sparky:`;
+      
+      return prompt;
+    };
+    
+    // 生成最终的prompt
+    const prompt = generatePrompt(lastChildMessage);
+    
+    // 返回标准的JSON响应格式
+    res.json({
+      success: true,
+      code: 0,
+      msg: "提示生成成功",
+      data: {
+        prompt,
+        childID
+      },
+      timestamp: new Date().toISOString(),
+    });
+    
+    console.log(`请求总耗时: ${Date.now() - startTime}ms`);
+  } catch (error) {
+    console.error("生成prompt时发生错误:", error);
+    
+    // 统一的错误处理
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+        code: 400,
+        msg: "请求参数验证失败",
+        error: {
+          type: "validation_error",
+          message: "请求参数验证失败",
+          details: error.errors,
+        },
+      });
+    }
+    // 服务器内部错误
+    console.error('API请求处理错误:', error);
+    return res.status(500).json({
+        success: false,
+        code: 500,
+        msg: "服务器内部错误",
+        error: {
+          type: "internal_error",
+          message: "服务器内部错误",
+        },
+      });
+  }
+});
+
 /**
  * 启动HTTP服务器
  */
@@ -108,8 +268,14 @@ export const startHttpServer = async () => {
 			"GET    /api/vocabulary          - 获取儿童词汇表(支持时间区间筛选)",
 		);
 		console.log(
+		"POST   /api/agent/generate-prompt     - 生成prompt内容",
+	);
+		console.log(
 			`示例: http://localhost:${port}/api/vocabulary?childId=test_child&startDate=2023-01-01&endDate=2023-12-31`,
 		);
+		console.log(
+		`示例: POST http://localhost:${port}/api/agent/generate-prompt`,
+	);
 	});
 
 	// 处理进程终止信号
