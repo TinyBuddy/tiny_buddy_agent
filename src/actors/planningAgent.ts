@@ -648,7 +648,7 @@ export class PlanningAgent implements BaseActor {
 			// model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
 			model: openai("gpt-4.1"),
 			prompt,
-			maxOutputTokens: 900,
+			maxOutputTokens: 1500,
 			temperature: 0.6,
 		});
 		console.log(`[PERF] LLM调用耗时: ${Date.now() - llmCallTime}ms`);
@@ -1161,6 +1161,7 @@ export class PlanningAgent implements BaseActor {
 		must include the recommendation to “reduce the use of Chinese vocabulary.”
 		
 		All output must be in English.
+		Keep the return length within 500 characters.
 		`
 		;
 	}
