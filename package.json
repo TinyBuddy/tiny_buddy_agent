@@ -26,7 +26,6 @@
 		"@voltagent/server-hono": "^1.0.0",
 		"ai": "^5.0.49",
 		"axios": "^1.12.2",
-		"dotenv": "^16.4.7",
 		"drizzle-orm": "^0.44.6",
 		"express": "^5.1.0",
 		"mem0ai": "^2.1.38",
@@ -40,6 +39,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
 		"@types/node": "^22.18.8",
+		"dotenv": "^17.2.3",
 		"ts-node": "^10.9.2",
 		"tsdown": "^0.15.2",
 		"tsx": "^4.19.2",

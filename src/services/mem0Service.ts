@@ -1,9 +1,14 @@
 import axios from 'axios';
 
 // mem0 API配置
-const MEM0_API_URL = process.env.MEM0_BASE_URL || 'https://api.mem0.ai';
+const MEM0_API_URL = process.env.MEM0_API_URL || process.env.MEM0_BASE_URL || 'https://api.mem0.ai';
 const MEM0_API_KEY = process.env.MEM0_API_KEY;
 const MEM0_ENABLED = process.env.MEM0_ENABLED === 'true';
+
+// 验证必要的配置
+if (MEM0_ENABLED && !MEM0_API_KEY) {
+  console.error('警告: mem0已启用但未配置API密钥，请检查MEM0_API_KEY环境变量');
+}
 
 // 创建axios实例
 const mem0Client = axios.create({
@@ -191,6 +196,8 @@ export class Mem0Service {
     message: string;
     important_info?: ImportantInfo;
     stored_memory?: ImportantMemory;
+    error_code?: string;
+    error_details?: string;
   }> {
     if (!MEM0_ENABLED) {
       console.log('mem0 service is disabled');
@@ -277,14 +284,17 @@ export class Mem0Service {
         updated_at: timestamp
       };
       
+      // 使用text字段，符合mem0 SDK规范
       const memoryData = {
-        content: memoryContent,
+        text: memoryContent,
         metadata,
         tags: [child_id, 'important_memory'],
         version: 'v2'
       };
       
+      console.log('创建新记忆数据:', { child_id, memoryData_length: memoryData.text.length });
       const response = await mem0Client.post('/v1/memories/', memoryData);
+      console.log('创建记忆成功:', response.data.id);
       
       return {
         success: true,
@@ -296,11 +306,48 @@ export class Mem0Service {
           metadata
         }
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update important memories:', error);
+      
+      // 详细的错误日志
+      if (error.response) {
+        console.error('mem0 API错误状态:', error.response.status);
+        console.error('mem0 API错误数据:', JSON.stringify(error.response.data, null, 2));
+        
+        // 根据错误类型提供更具体的错误信息
+        if (error.response.status === 401) {
+          return {
+            success: false,
+            message: 'Authentication failed: Invalid or expired API key',
+            error_code: 'AUTHENTICATION_FAILED'
+          };
+        } else if (error.response.status === 400) {
+          return {
+            success: false,
+            message: 'Invalid request parameters',
+            error_code: 'INVALID_PARAMETERS'
+          };
+        } else if (error.response.status === 404) {
+          return {
+            success: false,
+            message: 'mem0 API endpoint not found',
+            error_code: 'ENDPOINT_NOT_FOUND'
+          };
+        }
+      } else if (error.request) {
+        console.error('无法连接到mem0服务:', error.request);
+        return {
+          success: false,
+          message: 'Failed to connect to mem0 service',
+          error_code: 'CONNECTION_ERROR'
+        };
+      }
+      
       return {
         success: false,
-        message: 'Failed to update important memories'
+        message: 'Failed to update important memories',
+        error_code: 'UNKNOWN_ERROR',
+        error_details: error.message
       };
     }
   }
