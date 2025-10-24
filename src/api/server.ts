@@ -8,6 +8,7 @@ import app from "../app";
 import { db } from "../db/db";
 import { vocabulary } from "../db/schema";
 import type { InMemoryMemoryService } from "../services/memoryService";
+import { mem0Service, type UpdateImportantMemoriesRequest } from "../services/mem0Service";
 
 // 加载环境变量
 config();
@@ -259,7 +260,56 @@ apiApp.get("/api/interests/:childId?", async (c) => {
 	}
 });
 
-// 8. 获取词汇表端点（支持时间区间筛选）
+// 8. 更新儿童重要记忆端点（供第三方系统调用）
+apiApp.post("/api/important-memories", async (c) => {
+  try {
+    // 验证请求体
+    const requestBody = await c.req.json();
+    
+    // 确保必要的字段存在
+    if (!requestBody.child_id || !Array.isArray(requestBody.chat_history)) {
+      return c.json(
+        {
+          success: false,
+          error: "Parameter validation failed",
+          details: [
+            { message: "child_id and chat_history are required parameters" }
+          ],
+        },
+        400,
+      );
+    }
+
+    console.log(`更新儿童 ${requestBody.child_id} 的重要记忆`);
+
+    // 调用mem0服务更新重要记忆
+    const result = await mem0Service.updateImportantMemories({
+      child_id: requestBody.child_id,
+      chat_history: requestBody.chat_history
+    });
+
+    return c.json({
+      success: result.success,
+      message: result.message,
+      data: {
+        important_info: result.important_info,
+        stored_memory: result.stored_memory
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Error processing important memories update request:", error);
+    return c.json(
+      {
+        success: false,
+        error: "Internal server error",
+      },
+      500,
+    );
+  }
+});
+
+// 9. 获取词汇表端点（支持时间区间筛选）
 apiApp.get("/api/vocabulary", async (c) => {
 	try {
 		// 获取查询参数
@@ -330,6 +380,8 @@ apiApp.get("/api/vocabulary", async (c) => {
 	}
 });
 
+// 10. mem0相关接口 - 已迁移到 /api/important-memories 端点
+
 // 启动服务器函数
 export const startServer = async () => {
 	// 定义服务器端口，默认使用3142
@@ -353,6 +405,12 @@ export const startServer = async () => {
 	console.log(
 		"GET    /api/vocabulary          - 获取儿童词汇表(支持时间区间筛选)",
 	);
+	// mem0相关接口
+	console.log("\nmem0相关接口:");
+	console.log("POST   /v1/memories             - 添加记忆");
+	console.log("DELETE /v1/memories/:memory_id  - 删除记忆");
+	console.log("POST   /v2/memories/search      - 搜索记忆");
+	console.log("PUT    /v1/memories/:memory_id  - 更新记忆");
 
 	// 处理进程终止信号
 	const handleShutdown = async () => {
