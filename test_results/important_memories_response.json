@@ -1,0 +1,6 @@
+{
+  "success": false,
+  "message": "Authentication failed: Invalid or expired API key",
+  "data": {},
+  "timestamp": "2025-10-24T06:33:46.767Z"
+}
