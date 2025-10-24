@@ -21,6 +21,7 @@ const generatePromptSchema = z.object({
   gender: z.enum(["male", "female", "other"]),
   interests: z.array(z.string()),
   languageLevel: z.string().regex(/^L[1-5]$/i),
+  childAge: z.number().min(0).max(100),
   historyMsgs: z.array(
     z.object({
       child: z.string(),
@@ -114,6 +115,7 @@ app.get("/api/vocabulary", async (req, res) => {
 // 全局服务实例，避免每次请求都重新创建
 let globalMemoryService: InMemoryMemoryService | null = null;
 let globalKnowledgeBaseService: InMemoryKnowledgeBaseService | null = null;
+let globalPlanningAgent: PlanningAgent | null = null;
 
 // 初始化全局服务
 const initGlobalServices = async () => {
@@ -125,7 +127,17 @@ const initGlobalServices = async () => {
     globalKnowledgeBaseService = new InMemoryKnowledgeBaseService();
     await globalKnowledgeBaseService.init();
   }
-  return { memoryService: globalMemoryService, knowledgeBaseService: globalKnowledgeBaseService };
+  if (!globalPlanningAgent) {
+    globalPlanningAgent = new PlanningAgent({
+      knowledgeBaseService: globalKnowledgeBaseService,
+      memoryService: globalMemoryService,
+    });
+  }
+  return { 
+    memoryService: globalMemoryService, 
+    knowledgeBaseService: globalKnowledgeBaseService,
+    planningAgent: globalPlanningAgent
+  };
 };
 
 /**
@@ -136,12 +148,12 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
     const startTime = Date.now();
     
     // 验证请求参数
-    const { childID, gender, interests, languageLevel, historyMsgs } = generatePromptSchema.parse(req.body);
+    const { childID, gender, interests, languageLevel, childAge, historyMsgs } = generatePromptSchema.parse(req.body);
     
     console.log(`生成prompt请求: 儿童ID=${childID}, 语言级别=${languageLevel}`);
     
     // 使用全局服务实例
-    const { memoryService, knowledgeBaseService } = await initGlobalServices();
+    const { memoryService, knowledgeBaseService, planningAgent } = await initGlobalServices();
     
     // 创建儿童档案
     const childProfile = {
@@ -151,6 +163,7 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
       gender,
       interests,
       languageLevel: languageLevel.toUpperCase(),
+      age: childAge,
     };
     
     // 转换历史消息格式
@@ -170,15 +183,49 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
     // 获取最后一条儿童消息作为输入
     const lastChildMessage = historyMsgs.length > 0 ? historyMsgs[historyMsgs.length - 1].child : "Hello";
     
-    // 直接生成简单的规划结果，避免调用PlanningAgent
-    const parsedPlanResult = {
-      type: "plan",
-      interactionType: "chat",
-      objectives: ["Build emotional connection", "Encourage expression"],
-      strategy: `Chat with ${childID} as a friend, using simple and easy-to-understand language, maintaining a positive and encouraging tone. Focus on topics like ${interests.join(', ').replace(/, ([^,]*)$/, ' and $1')}.`
-    };
+    // 将所有历史消息格式化为更适合PlanningAgent处理的格式
+    const allChildMessages = historyMsgs.map(msg => msg.child);
     
-    console.log(`生成规划时间: ${Date.now() - startTime}ms`);
+    // 初始化规划Agent（使用全局实例）
+    await planningAgent.init({
+      childProfile,
+      conversationHistory,
+      knowledgeBase: [] // 添加必要的knowledgeBase属性，初始化为空数组
+    });
+    
+    // 调用规划Agent的process方法生成计划，传递所有历史消息
+    const planResult = await planningAgent.process({
+      input: allChildMessages.length > 0 ? allChildMessages.join(" ") : lastChildMessage,
+      context: {
+        childProfile,
+        conversationHistory,
+        knowledgeBase: [] // 添加必要的knowledgeBase属性
+      },
+    });
+    
+    // 解析规划结果
+    let parsedPlanResult;
+    if (planResult && planResult.output) {
+      try {
+        parsedPlanResult = typeof planResult.output === 'string' ? JSON.parse(planResult.output) : planResult.output;
+      } catch (parseError) {
+        console.warn("解析规划结果失败，使用降级方案:", parseError);
+        parsedPlanResult = {
+          type: "chat",
+          interactionType: "chat",
+          strategy: "Chat with the child as a friend using simple and easy-to-understand language",
+        };
+      }
+    } else {
+      // 如果没有有效的规划结果，使用降级方案
+      parsedPlanResult = {
+        type: "chat",
+        interactionType: "chat",
+        strategy: "Chat with the child as a friend using simple and easy-to-understand language",
+      };
+    }
+    
+    console.log("规划结果:", parsedPlanResult);
     
     // 实现简化版的prompt生成函数
     const generatePrompt = (message: string) => {
@@ -187,7 +234,7 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
         .map((m) => `${m.type === "user" ? "Child" : "Sparky"}: ${m.content}`)
         .join("\n");
 
-      // 从全局配置获取系统提示词
+      // 从全局配置获取系统提示词，确保使用正确的儿童年龄
       let systemPrompt = getFullSystemPrompt(childProfile);
 
       // 添加教学策略

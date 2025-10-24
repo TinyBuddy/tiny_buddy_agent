@@ -1013,12 +1013,30 @@ export class PlanningAgent implements BaseActor {
 				console.log("检测到数组响应，使用第一个元素作为规划");
 				// 确保数组不为空且第一个元素有效
 				if (parsedJson.length > 0 && parsedJson[0]) {
-					llmPlan = parsedJson[0];
+					// 确保llmPlan始终是一个对象
+					if (typeof parsedJson[0] === 'string') {
+						llmPlan = { 
+							interactionType: "chat",
+							strategy: parsedJson[0],
+							objectives: [parsedJson[0]]
+						};
+					} else {
+						llmPlan = parsedJson[0];
+					}
 				} else {
 					llmPlan = { interactionType: "chat" };
 				}
 			} else {
-				llmPlan = parsedJson;
+				// 确保parsedJson是对象类型
+				if (typeof parsedJson === 'object' && parsedJson !== null) {
+					llmPlan = parsedJson;
+				} else {
+					llmPlan = { 
+						interactionType: "chat",
+						strategy: String(parsedJson || ""),
+						objectives: [String(parsedJson || "")]
+					};
+				}
 			}
 
 			// 确保llmPlan具有必要的字段 - 增强验证
