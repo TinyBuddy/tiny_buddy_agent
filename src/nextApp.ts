@@ -146,16 +146,21 @@ const initGlobalServices = async () => {
 app.post("/api/agent/generate-prompt", async (req, res) => {
   try {
     const startTime = Date.now();
+    const parseStart = Date.now();
     
     // 验证请求参数
     const { childID, gender, interests, languageLevel, childAge, historyMsgs } = generatePromptSchema.parse(req.body);
+    console.log(`[API_PERF] 参数解析与验证耗时: ${Date.now() - parseStart}ms`);
     
     console.log(`生成prompt请求: 儿童ID=${childID}, 语言级别=${languageLevel}`);
     
     // 使用全局服务实例
+    const serviceStart = Date.now();
     const { memoryService, knowledgeBaseService, planningAgent } = await initGlobalServices();
+    console.log(`[API_PERF] 服务初始化耗时: ${Date.now() - serviceStart}ms`);
     
     // 创建儿童档案
+    const profileStart = Date.now();
     const childProfile = {
       ...createDefaultChildProfile(childID),
       id: childID,
@@ -165,8 +170,10 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
       languageLevel: languageLevel.toUpperCase(),
       age: childAge,
     };
+    console.log(`[API_PERF] 创建儿童档案耗时: ${Date.now() - profileStart}ms`);
     
     // 转换历史消息格式
+    const historyStart = Date.now();
     const conversationHistory = historyMsgs.flatMap((msg: { child: string; AI: string }) => [
       createMessage({
         type: "user",
@@ -179,6 +186,7 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
         sender: "assistant",
       }),
     ]);
+    console.log(`[API_PERF] 转换历史消息耗时: ${Date.now() - historyStart}ms`);
     
     // 获取最后一条儿童消息作为输入
     const lastChildMessage = historyMsgs.length > 0 ? historyMsgs[historyMsgs.length - 1].child : "Hello";
@@ -187,13 +195,16 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
     const allChildMessages = historyMsgs.map(msg => msg.child);
     
     // 初始化规划Agent（使用全局实例）
+    const initAgentStart = Date.now();
     await planningAgent.init({
       childProfile,
       conversationHistory,
       knowledgeBase: [] // 添加必要的knowledgeBase属性，初始化为空数组
     });
+    console.log(`[API_PERF] 初始化规划Agent耗时: ${Date.now() - initAgentStart}ms`);
     
     // 调用规划Agent的process方法生成计划，传递所有历史消息
+    const planStart = Date.now();
     const planResult = await planningAgent.process({
       input: allChildMessages.length > 0 ? allChildMessages.join(" ") : lastChildMessage,
       context: {
@@ -202,8 +213,10 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
         knowledgeBase: [] // 添加必要的knowledgeBase属性
       },
     });
+    console.log(`[API_PERF] 生成规划耗时: ${Date.now() - planStart}ms`);
     
     // 解析规划结果
+    const parsePlanStart = Date.now();
     let parsedPlanResult;
     if (planResult && planResult.output) {
       try {
@@ -224,6 +237,7 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
         strategy: "Chat with the child as a friend using simple and easy-to-understand language",
       };
     }
+    console.log(`[API_PERF] 解析规划结果耗时: ${Date.now() - parsePlanStart}ms`);
     
     console.log("规划结果:", parsedPlanResult);
     
@@ -253,9 +267,12 @@ Sparky:`;
     };
     
     // 生成最终的prompt
+    const promptStart = Date.now();
     const prompt = generatePrompt(lastChildMessage);
+    console.log(`[API_PERF] 生成prompt耗时: ${Date.now() - promptStart}ms`);
     
     // 返回标准的JSON响应格式
+    const responseStart = Date.now();
     res.json({
       success: true,
       code: 0,
@@ -266,8 +283,9 @@ Sparky:`;
       },
       timestamp: new Date().toISOString(),
     });
+    console.log(`[API_PERF] 发送响应耗时: ${Date.now() - responseStart}ms`);
     
-    console.log(`请求总耗时: ${Date.now() - startTime}ms`);
+    console.log(`[API_PERF] 请求总耗时: ${Date.now() - startTime}ms`);
   } catch (error) {
     console.error("生成prompt时发生错误:", error);
     

@@ -528,16 +528,24 @@ export class PlanningAgent implements BaseActor {
 		context: ActorContext;
 		plan?: PlanningResult;
 	}): Promise<{ output: string; metadata?: Record<string, unknown> }> {
+		const processStartTime = Date.now();
+		console.log(`[PERF] process 函数开始执行`);
+		
 		try {
 			// 在开发模式下，直接使用模拟规划
 			if (DEVELOPMENT_MODE) {
 				console.log("开发模式: 使用模拟规划");
+				const mockPlanTime = Date.now();
 				const mockPlan = this.createMockPlan(input.context);
+				console.log(`[PERF] 创建模拟规划耗时: ${Date.now() - mockPlanTime}ms`);
 				this.lastPlan = mockPlan;
 
 				// 根据计划生成返回信息
+				const responseTime = Date.now();
 				const response = this.generateResponse(mockPlan);
+				console.log(`[PERF] 生成响应耗时: ${Date.now() - responseTime}ms`);
 
+				console.log(`[PERF] process 函数执行完成，总耗时: ${Date.now() - processStartTime}ms`);
 				return {
 					output: response,
 					metadata: {
@@ -550,12 +558,17 @@ export class PlanningAgent implements BaseActor {
 			}
 
 			// 生产模式下，调用大模型生成规划
+			const llmPlanTime = Date.now();
 			const plan = await this.generatePlanWithLLM(input.context);
+			console.log(`[PERF] LLM生成规划总耗时: ${Date.now() - llmPlanTime}ms`);
 			this.lastPlan = plan;
 
 			// 根据计划生成返回信息
+			const responseTime = Date.now();
 			const response = this.generateResponse(plan);
+			console.log(`[PERF] 生成响应耗时: ${Date.now() - responseTime}ms`);
 
+			console.log(`[PERF] process 函数执行完成，总耗时: ${Date.now() - processStartTime}ms`);
 			return {
 				output: response,
 				metadata: {
@@ -567,9 +580,12 @@ export class PlanningAgent implements BaseActor {
 		} catch (error) {
 			console.error("大模型规划失败:", error);
 			// 降级到默认规划
+			const fallbackTime = Date.now();
 			const defaultPlan = this.createFallbackPlan(input.context);
+			console.log(`[PERF] 创建降级规划耗时: ${Date.now() - fallbackTime}ms`);
 			const response = this.generateResponse(defaultPlan);
 
+			console.log(`[PERF] process 函数异常完成，总耗时: ${Date.now() - processStartTime}ms`);
 			return {
 				output: response,
 				metadata: {
@@ -605,22 +621,29 @@ export class PlanningAgent implements BaseActor {
 	private async generatePlanWithLLM(
 		context: ActorContext,
 	): Promise<PlanningResult> {
+		const startTime = Date.now();
+		console.log("[PERF] 开始执行 generatePlanWithLLM");
+		
 		const { childProfile, conversationHistory, knowledgeBase } = context;
+		const getRecentMessagesTime = Date.now();
 		const recentMessages = this.getRecentMessages(conversationHistory, 5);
+		console.log(`[PERF] getRecentMessages 耗时: ${Date.now() - getRecentMessagesTime}ms`);
+		
+		const summarizeKnowledgeTime = Date.now();
 		const knowledgeSummary = this.summarizeKnowledgeBase(knowledgeBase);
-
-		console.log("规划agent 调用最近5条消息:", recentMessages);
+		console.log(`[PERF] summarizeKnowledgeBase 耗时: ${Date.now() - summarizeKnowledgeTime}ms`);
 
 		// 构建规划提示词
+		const buildPromptTime = Date.now();
 		const prompt = this.buildPlanningPrompt(
 			childProfile,
 			recentMessages,
 			knowledgeSummary,
 		);
-
-		console.log("规划agent promt:", prompt);
+		console.log(`[PERF] buildPlanningPrompt 耗时: ${Date.now() - buildPromptTime}ms`);
 
 		// 调用大模型生成规划
+		const llmCallTime = Date.now();
 		const result = await generateText({
 			// model: deepseek(process.env.DEEPSEEK_MODEL || "deepseek-chat"),
 			model: openai("gpt-4.1"),
@@ -628,6 +651,7 @@ export class PlanningAgent implements BaseActor {
 			maxOutputTokens: 900,
 			temperature: 0.6,
 		});
+		console.log(`[PERF] LLM调用耗时: ${Date.now() - llmCallTime}ms`);
 
 		// 解析大模型返回的JSON规划
 		let llmPlan: Record<string, unknown>;
@@ -636,6 +660,7 @@ export class PlanningAgent implements BaseActor {
 			const text = result.text.trim();
 			console.log("LLM原始响应:", text); // 用于调试
 
+			const jsonParsingTime = Date.now();
 			// 尝试多种方式提取JSON
 			let jsonStr: string | null = null;
 
@@ -675,7 +700,46 @@ export class PlanningAgent implements BaseActor {
 				}
 			}
 
-			// 方式4: 如果返回以[开头但可能不完整，尝试构造有效的JSON
+			// 在清理之前先记录原始提取的JSON字符串
+			// 首先尝试提取完整的JSON对象
+			try {
+				// 查找完整的JSON对象
+				const jsonObjectMatch = text.match(/\{[\s\S]*"interactionType"[\s\S]*\}/);
+				if (jsonObjectMatch?.[0]) {
+					console.log(`[PERF] 成功提取完整JSON对象`);
+					jsonStr = jsonObjectMatch[0];
+				}
+			} catch (e) {
+				console.error("JSON对象匹配失败:", e);
+			}
+			
+			// 如果没有找到完整对象，尝试从代码块中提取
+			if (!jsonStr) {
+				try {
+					const codeBlockMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+					if (codeBlockMatch?.[1]) {
+						console.log(`[PERF] 从代码块中提取JSON`);
+						jsonStr = codeBlockMatch[1];
+					}
+				} catch (e) {
+					console.error("代码块匹配失败:", e);
+				}
+			}
+			
+			// 如果仍然没有找到，尝试查找数组（作为最后手段）
+			if (!jsonStr) {
+				try {
+					const arrayMatch = text.match(/\[[^\]]*\]/s);
+					if (arrayMatch) {
+						console.log(`[PERF] 检测到JSON数组`);
+						jsonStr = arrayMatch[0];
+					}
+				} catch (e) {
+					console.error("数组匹配失败:", e);
+				}
+			}
+			
+			// 如果返回以[开头但可能不完整，尝试构造有效的JSON
 			if (!jsonStr && text.trim().startsWith('[')) {
 				console.log("检测到以[开头的不完整响应，尝试构造有效的JSON");
 				// 构造一个包含基本结构的JSON
@@ -685,7 +749,7 @@ export class PlanningAgent implements BaseActor {
 					strategy: `Chat with ${childProfile.name} as a friend`
 				}]);
 			}
-
+			
 			// 如果仍然没有有效的JSON，使用默认结构
 			if (!jsonStr) {
 				console.warn("无法提取有效的JSON，使用默认规划结构");
@@ -695,17 +759,7 @@ export class PlanningAgent implements BaseActor {
 					strategy: `Chat with ${childProfile.name} as a friend`
 				});
 			}
-
-			// 在清理之前先记录原始提取的JSON字符串
-			// 提取JSON部分（假设是数组格式）
-			jsonStr = result.text; // 改为赋值，避免重复声明
-			// 尝试提取JSON数组部分
-			const jsonStart = jsonStr.indexOf('[');
-			const jsonEnd = jsonStr.lastIndexOf(']');
-			if (jsonStart !== -1 && jsonEnd > jsonStart) {
-				jsonStr = jsonStr.substring(jsonStart, jsonEnd + 1);
-			}
-
+			
 			console.log("提取的原始JSON字符串:", jsonStr);
 
 			// 清理JSON字符串，移除可能导致解析失败的字符
@@ -1057,7 +1111,8 @@ export class PlanningAgent implements BaseActor {
 		}
 
 		// 转换为PlanningResult格式
-		return {
+		const formatResultTime = Date.now();
+		const planningResult = {
 			type: this.mapInteractionType(
 				typeof llmPlan.interactionType === "string"
 					? llmPlan.interactionType
@@ -1072,6 +1127,9 @@ export class PlanningAgent implements BaseActor {
 				: [],
 			strategy: typeof llmPlan.strategy === "string" ? llmPlan.strategy : "",
 		};
+		console.log(`[PERF] 格式化结果耗时: ${Date.now() - formatResultTime}ms`);
+		console.log(`[PERF] 总执行时间: ${Date.now() - startTime}ms`);
+		return planningResult;
 	}
 
 	// 构建规划提示词
