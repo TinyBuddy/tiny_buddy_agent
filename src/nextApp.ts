@@ -196,7 +196,7 @@ class LRUCache {
 }
 
 // 创建prompt缓存，缓存100条记录，有效期1分钟
-const promptCache = new LRUCache({ max: 100, maxAge: 1000 * 60 * 1 });
+const promptCache = new LRUCache({ max: 100, maxAge: 1000 * 6 * 1 });
 
 /**
  * 生成prompt内容的API端点
