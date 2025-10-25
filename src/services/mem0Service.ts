@@ -1,23 +1,55 @@
-import axios from 'axios';
+import MemoryClient from 'mem0ai';
 
-// mem0 API配置
-const MEM0_API_URL = process.env.MEM0_API_URL || process.env.MEM0_BASE_URL || 'https://api.mem0.ai';
-const MEM0_API_KEY = process.env.MEM0_API_KEY;
-const MEM0_ENABLED = process.env.MEM0_ENABLED === 'true';
+// mem0 API配置 - 在类内部动态获取
+let mem0Client: MemoryClient | null = null;
 
-// 验证必要的配置
-if (MEM0_ENABLED && !MEM0_API_KEY) {
-  console.error('警告: mem0已启用但未配置API密钥，请检查MEM0_API_KEY环境变量');
+// 获取mem0客户端实例的函数
+function getMem0Client(): MemoryClient {
+  if (!mem0Client) {
+    const MEM0_API_KEY = process.env.MEM0_API_KEY;
+    const MEM0_ENABLED = process.env.MEM0_ENABLED === 'true';
+    
+    // 验证必要的配置
+    if (MEM0_ENABLED && !MEM0_API_KEY) {
+      console.error('警告: mem0已启用但未配置API密钥，请检查MEM0_API_KEY环境变量');
+    }
+    
+    mem0Client = new MemoryClient({ 
+      apiKey: MEM0_API_KEY || '' 
+    });
+  }
+  return mem0Client;
 }
 
-// 创建axios实例
-const mem0Client = axios.create({
-  baseURL: MEM0_API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-    ...(MEM0_API_KEY && { 'Authorization': `Bearer ${MEM0_API_KEY}` }),
-  },
-});
+// 应用ID配置
+const APP_ID = process.env.MEM0_APP_ID || 'tiny_buddy_agent';
+
+// 第三方系统接口请求定义
+export interface UpdateImportantMemoriesRequest {
+  child_id: string;
+  chat_history: string[]; // 历史对话记录数组
+}
+
+// 重要记忆信息接口
+export interface ImportantInfo {
+  interests: string[];      // 兴趣爱好
+  importantEvents: string[]; // 重要事件
+  familyMembers: string[];   // 家庭成员
+  friends: string[];         // 朋友伙伴
+  dreams: string[];          // 理想梦想
+}
+
+// 记忆存储接口
+export interface ImportantMemory {
+  id: string;
+  content: string;
+  metadata: {
+    child_id: string;
+    important_info: ImportantInfo;
+    created_at: string;
+    updated_at: string;
+  };
+}
 
 // 扩展关键信息提取正则表达式 - English patterns
 const INTEREST_PATTERNS = [
@@ -168,29 +200,170 @@ function hasImportantInfo(info: ImportantInfo): boolean {
          info.dreams.length > 0;
 }
 
-// mem0服务类 - 专注于重要记忆管理
+// 默认配置常量
+const AGENT_ID = 'tiny_buddy_agent';
+const USER_ID = 'tiny_buddy_user';
+
+// mem0服务类 - 使用官方mem0ai SDK重写
 export class Mem0Service {
-  // 更新特定记忆
+  // 添加记忆 - 使用官方SDK的add方法
+  async add(messages: Array<{ role: "user" | "assistant"; content: string }>, options: {
+    user_id?: string;
+    app_id?: string;
+    metadata?: any;
+  } = {}): Promise<any[]> {
+    try {
+      const result = await getMem0Client().add(messages, {
+        app_id: options.app_id || APP_ID,
+        user_id: options.user_id || USER_ID,
+        metadata: {
+          agent_id: AGENT_ID,
+          child_id: options.metadata?.child_id,
+          ...options.metadata
+        }
+      });
+      
+      // 处理数组格式响应
+      if (Array.isArray(result)) {
+        return result;
+      }
+      return [result];
+    } catch (error) {
+      console.error('添加记忆失败:', error);
+      throw error;
+    }
+  }
+  
+  // 搜索记忆 - 使用官方SDK的search方法
+  async search(query: string, options: {
+    limit?: number;
+    user_id?: string;
+    app_id?: string;
+    metadata?: any;
+  } = {}): Promise<any[]> {
+    try {
+      const result = await getMem0Client().search(query, {
+        limit: options.limit || 10,
+        app_id: options.app_id || APP_ID,
+        user_id: options.user_id || USER_ID,
+        metadata: {
+          agent_id: AGENT_ID,
+          child_id: options.metadata?.child_id,
+          ...options.metadata
+        }
+      });
+      
+      // 处理数组格式响应
+      if (Array.isArray(result)) {
+        return result;
+      }
+      return [result];
+    } catch (error) {
+      console.error('搜索记忆失败:', error);
+      throw error;
+    }
+  }
+  
+  // 获取所有记忆 - 使用官方SDK的search方法（使用通配符查询获取全部）
+  async getAll(options: {
+    user_id?: string;
+    app_id?: string;
+    limit?: number;
+    metadata?: any;
+  } = {}): Promise<any[]> {
+    try {
+      const result = await getMem0Client().search('*', {
+        limit: options.limit || 100,
+        app_id: options.app_id || APP_ID,
+        user_id: options.user_id || USER_ID,
+        metadata: {
+          agent_id: AGENT_ID,
+          child_id: options.metadata?.child_id,
+          ...options.metadata
+        }
+      });
+      
+      // 处理数组格式响应
+      if (Array.isArray(result)) {
+        return result;
+      }
+      return [result];
+    } catch (error) {
+      console.error('获取所有记忆失败:', error);
+      throw error;
+    }
+  }
+  
+  // 更新记忆 - 使用官方SDK的update方法
+  async update(memoryId: string, data: {
+    metadata?: any;
+    text?: string;
+  }): Promise<any> {
+    try {
+      const result = await getMem0Client().update(memoryId, {
+        metadata: data.metadata
+      });
+      
+      // 处理数组格式响应
+      if (Array.isArray(result) && result.length > 0) {
+        return result[0];
+      }
+      return result;
+    } catch (error) {
+      console.error(`更新记忆失败 (ID: ${memoryId}):`, error);
+      throw error;
+    }
+  }
+  
+  // 删除记忆 - 使用官方SDK的delete方法
+  async delete(memoryId: string): Promise<any> {
+    try {
+      const result = await getMem0Client().delete(memoryId);
+      return result;
+    } catch (error) {
+      console.error(`删除记忆失败 (ID: ${memoryId}):`, error);
+      throw error;
+    }
+  }
+  
+  // 获取特定记忆 - 使用官方SDK的get方法
+  async get(memoryId: string): Promise<any> {
+    try {
+      const result = await getMem0Client().get(memoryId);
+      
+      // 处理数组格式响应
+      if (Array.isArray(result) && result.length > 0) {
+        return result[0];
+      }
+      return result;
+    } catch (error) {
+      console.error(`获取记忆失败 (ID: ${memoryId}):`, error);
+      throw error;
+    }
+  }
+  
+  // 更新特定记忆（内部方法，保持向后兼容）
   private async updateMemory(memoryId: string, data: {
     content: string;
     metadata: any;
     tags?: string[];
   }): Promise<any> {
     try {
-      // 符合mem0 SDK的update接口
-      const response = await mem0Client.put(`/v1/memories/${memoryId}`, {
-        text: data.content,  // 使用text字段，符合mem0 SDK示例
-        metadata: data.metadata,
-        tags: data.tags
+      // 使用新的update方法
+      return await this.update(memoryId, {
+        metadata: {
+          ...data.metadata,
+          content: data.content,
+          updated_at: new Date().toISOString()
+        }
       });
-      return response.data;
     } catch (error) {
       console.error(`更新记忆失败 (ID: ${memoryId}):`, error);
       throw error;
     }
   }
 
-  // 统一接口：更新重要记忆
+  // 统一接口：更新重要记忆 - 使用新的官方SDK方法
   async updateImportantMemories(req: UpdateImportantMemoriesRequest): Promise<{
     success: boolean;
     message: string;
@@ -199,6 +372,7 @@ export class Mem0Service {
     error_code?: string;
     error_details?: string;
   }> {
+    const MEM0_ENABLED = process.env.MEM0_ENABLED === 'true';
     if (!MEM0_ENABLED) {
       console.log('mem0 service is disabled');
       return {
@@ -222,21 +396,29 @@ export class Mem0Service {
         };
       }
       
-      // 2. 查找现有的重要记忆
-      const existingMemories = await this.searchImportantMemories(child_id);
+      // 2. 查找现有的重要记忆 - 使用新的search方法
+      const existingMemories = await this.search('*', {
+        user_id: child_id,
+        limit: 10
+      });
       
       // 3. 合并新旧重要信息（如果有现有记忆）
       let finalImportantInfo = newImportantInfo;
       if (existingMemories.length > 0) {
-        finalImportantInfo = this.mergeImportantInfo(
-          existingMemories.map(mem => mem.metadata.important_info)
-        );
+        // 从现有记忆中提取重要信息
+        const existingImportantInfos = existingMemories
+          .filter(mem => mem.metadata && mem.metadata.important_info)
+          .map(mem => mem.metadata.important_info);
         
-        // 合并新的重要信息
-        finalImportantInfo = this.mergeImportantInfo([
-          finalImportantInfo,
-          newImportantInfo
-        ]);
+        if (existingImportantInfos.length > 0) {
+          finalImportantInfo = this.mergeImportantInfo(existingImportantInfos);
+          
+          // 合并新的重要信息
+          finalImportantInfo = this.mergeImportantInfo([
+            finalImportantInfo,
+            newImportantInfo
+          ]);
+        }
         
         // 生成重要记忆内容
         const memoryContent = this.generateMemoryContent(finalImportantInfo);
@@ -249,16 +431,17 @@ export class Mem0Service {
           updated_at: timestamp
         };
         
-        // 使用update接口更新记忆
-        const updatedMemory = await this.updateMemory(existingMemories[0].id, {
-          content: memoryContent,
-          metadata,
-          tags: [child_id, 'important_memory']
+        // 使用新的update接口更新记忆
+        const updatedMemory = await this.update(existingMemories[0].id, {
+          metadata: {
+            ...metadata,
+            content: memoryContent
+          }
         });
         
         // 删除其他可能存在的旧记忆（如果有多个）
         for (const memory of existingMemories.slice(1)) {
-          await this.deleteMemory(memory.id);
+          await this.delete(memory.id);
         }
         
         return {
@@ -273,7 +456,7 @@ export class Mem0Service {
         };
       }
       
-      // 4. 如果没有现有记忆，创建新的重要记忆
+      // 4. 如果没有现有记忆，创建新的重要记忆 - 使用新的add方法
       const memoryContent = this.generateMemoryContent(finalImportantInfo);
       
       const timestamp = new Date().toISOString();
@@ -284,24 +467,29 @@ export class Mem0Service {
         updated_at: timestamp
       };
       
-      // 使用text字段，符合mem0 SDK规范
-      const memoryData = {
-        text: memoryContent,
-        metadata,
-        tags: [child_id, 'important_memory'],
-        version: 'v2'
-      };
+      // 使用新的add方法创建记忆
+      const messages = [
+        { role: 'user' as const, content: memoryContent }
+      ];
       
-      console.log('创建新记忆数据:', { child_id, memoryData_length: memoryData.text.length });
-      const response = await mem0Client.post('/v1/memories/', memoryData);
-      console.log('创建记忆成功:', response.data.id);
+      console.log('创建新记忆数据:', { child_id, memoryContent_length: memoryContent.length });
+      const addResult = await this.add(messages, {
+        user_id: child_id,
+        metadata: {
+          ...metadata,
+          content: memoryContent
+        }
+      });
+      
+      const memoryId = addResult[0]?.id;
+      console.log('创建记忆成功:', memoryId);
       
       return {
         success: true,
         message: 'Important memories created successfully',
         important_info: finalImportantInfo,
         stored_memory: {
-          id: response.data.id,
+          id: memoryId,
           content: memoryContent,
           metadata
         }
@@ -352,30 +540,18 @@ export class Mem0Service {
     }
   }
   
-  // 搜索特定孩子的重要记忆
+  // 搜索特定孩子的重要记忆（内部方法，保持向后兼容）
   private async searchImportantMemories(child_id: string): Promise<ImportantMemory[]> {
     try {
-      const searchData = {
-        query: '',
-        limit: 10,
-        filters: {
-          AND: [
-            {
-              metadata: {
-                child_id
-              }
-            }
-          ]
-        },
-        use_knowledge_graph: true
-      };
+      // 使用新的search方法
+      const memories = await this.search('*', {
+        user_id: child_id,
+        limit: 10
+      });
       
-      // 使用v2版本的搜索接口，符合mem0 SDK示例
-      const response = await mem0Client.post('/v2/memories/search', searchData);
-      
-      return response.data.map((item: any) => ({
+      return memories.map((item: any) => ({
         id: item.id,
-        content: item.content || '',
+        content: item.memory || item.text || item.content || '',
         metadata: item.metadata || {}
       })).filter((mem: ImportantMemory) => 
         mem.metadata && mem.metadata.important_info
@@ -389,8 +565,8 @@ export class Mem0Service {
   // 删除特定记忆
   private async deleteMemory(memoryId: string): Promise<void> {
     try {
-      // 符合mem0 SDK的delete接口
-      await mem0Client.delete(`/v1/memories/${memoryId}`);
+      // 使用官方SDK的delete方法
+      await this.delete(memoryId);
     } catch (error) {
       console.error(`删除记忆失败 (ID: ${memoryId}):`, error);
       // 忽略删除错误，继续执行
