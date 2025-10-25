@@ -790,6 +790,7 @@ export class PlanningAgent implements BaseActor {
 		);
 		console.log(`[PERF] buildPlanningPrompt 耗时: ${Date.now() - buildPromptTime}ms`);
 
+		console.log(`[PERF] 提示词: ${prompt}`);
 		// 调用大模型生成规划，优化参数
 		const llmCallTime = Date.now();
 		const result = await generateText({
