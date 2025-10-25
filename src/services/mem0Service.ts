@@ -394,8 +394,30 @@ export class Mem0Service {
       // 1. 提取新的重要信息
       const newImportantInfo = extractImportantInfo(chat_history);
       
-      // 如果没有提取到重要信息，直接返回
+      // 如果没有提取到重要信息，尝试返回历史重要信息
       if (!hasImportantInfo(newImportantInfo)) {
+        // 查找现有的重要记忆
+        const existingMemories = await this.search('*', {
+          user_id: child_id,
+          limit: 10
+        });
+        
+        if (existingMemories.length > 0) {
+          // 从现有记忆中提取重要信息
+          const existingImportantInfos = existingMemories
+            .filter(mem => mem.metadata && mem.metadata.important_info)
+            .map(mem => mem.metadata.important_info);
+          
+          if (existingImportantInfos.length > 0) {
+            const historicalInfo = this.mergeImportantInfo(existingImportantInfos);
+            return {
+              success: true,
+              message: 'No new important information extracted, returning historical data',
+              important_info: historicalInfo
+            };
+          }
+        }
+        
         return {
           success: true,
           message: 'No important information extracted',
