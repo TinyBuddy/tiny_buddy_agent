@@ -117,21 +117,29 @@ let globalMemoryService: InMemoryMemoryService | null = null;
 let globalKnowledgeBaseService: InMemoryKnowledgeBaseService | null = null;
 let globalPlanningAgent: PlanningAgent | null = null;
 
+// 服务初始化完成标志
+let globalServicesInitialized = false;
+
 // 初始化全局服务
 const initGlobalServices = async () => {
-  if (!globalMemoryService) {
-    globalMemoryService = new InMemoryMemoryService();
-    await globalMemoryService.init();
-  }
-  if (!globalKnowledgeBaseService) {
-    globalKnowledgeBaseService = new InMemoryKnowledgeBaseService();
-    await globalKnowledgeBaseService.init();
-  }
-  if (!globalPlanningAgent) {
-    globalPlanningAgent = new PlanningAgent({
-      knowledgeBaseService: globalKnowledgeBaseService,
-      memoryService: globalMemoryService,
-    });
+  if (!globalServicesInitialized) {
+    if (!globalMemoryService) {
+      globalMemoryService = new InMemoryMemoryService();
+      await globalMemoryService.init();
+    }
+    if (!globalKnowledgeBaseService) {
+      globalKnowledgeBaseService = new InMemoryKnowledgeBaseService();
+      await globalKnowledgeBaseService.init();
+    }
+    if (!globalPlanningAgent) {
+      globalPlanningAgent = new PlanningAgent({
+        knowledgeBaseService: globalKnowledgeBaseService,
+        memoryService: globalMemoryService,
+      });
+      // 只初始化一次Agent
+      await globalPlanningAgent.init();
+    }
+    globalServicesInitialized = true;
   }
   return { 
     memoryService: globalMemoryService, 
@@ -139,6 +147,56 @@ const initGlobalServices = async () => {
     planningAgent: globalPlanningAgent
   };
 };
+
+/**
+ * 简单的LRU缓存实现
+ */
+class LRUCache {
+  private cache: Map<string, { value: any, timestamp: number }>;
+  private maxSize: number;
+  private maxAge: number;
+
+  constructor(options: { max: number, maxAge: number }) {
+    this.cache = new Map();
+    this.maxSize = options.max;
+    this.maxAge = options.maxAge;
+  }
+
+  get(key: string): any | undefined {
+    const item = this.cache.get(key);
+    if (!item) return undefined;
+
+    // 检查是否过期
+    if (Date.now() - item.timestamp > this.maxAge) {
+      this.cache.delete(key);
+      return undefined;
+    }
+
+    // 移动到Map的末尾（最近使用）
+    this.cache.delete(key);
+    this.cache.set(key, item);
+    return item.value;
+  }
+
+  set(key: string, value: any): void {
+    // 如果达到最大容量，删除最旧的项
+    if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
+      const oldestKeyResult = this.cache.keys().next();
+      if (!oldestKeyResult.done && oldestKeyResult.value) {
+        this.cache.delete(oldestKeyResult.value);
+      }
+    }
+
+    this.cache.set(key, { value, timestamp: Date.now() });
+  }
+
+  has(key: string): boolean {
+    return this.get(key) !== undefined;
+  }
+}
+
+// 创建prompt缓存，缓存100条记录，有效期1分钟
+const promptCache = new LRUCache({ max: 100, maxAge: 1000 * 60 * 1 });
 
 /**
  * 生成prompt内容的API端点
@@ -151,6 +209,34 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
     // 验证请求参数
     const { childID, gender, interests, languageLevel, childAge, historyMsgs } = generatePromptSchema.parse(req.body);
     console.log(`[API_PERF] 参数解析与验证耗时: ${Date.now() - parseStart}ms`);
+    
+    // 生成缓存键
+    const lastChildMsg = historyMsgs.length > 0 ? historyMsgs[historyMsgs.length - 1].child : "Hello";
+    const cacheKey = JSON.stringify({
+      childID,
+      gender,
+      interests: interests.sort(), // 排序确保相同兴趣但顺序不同的请求能命中缓存
+      languageLevel,
+      childAge,
+      lastChildMessage: lastChildMsg
+    });
+    
+    // 检查缓存
+    if (promptCache.has(cacheKey)) {
+      const cachedResult = promptCache.get(cacheKey);
+      console.log(`[API_PERF] 缓存命中，跳过处理，总耗时: ${Date.now() - startTime}ms`);
+      return res.json({
+        success: true,
+        code: 0,
+        msg: "提示生成成功(来自缓存)",
+        data: {
+          prompt: cachedResult,
+          childID,
+          fromCache: true
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
     
     console.log(`生成prompt请求: 儿童ID=${childID}, 语言级别=${languageLevel}`);
     
@@ -194,17 +280,11 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
     // 将所有历史消息格式化为更适合PlanningAgent处理的格式
     const allChildMessages = historyMsgs.map(msg => msg.child);
     
-    // 初始化规划Agent（使用全局实例）
-    const initAgentStart = Date.now();
-    await planningAgent.init({
-      childProfile,
-      conversationHistory,
-      knowledgeBase: [] // 添加必要的knowledgeBase属性，初始化为空数组
-    });
-    console.log(`[API_PERF] 初始化规划Agent耗时: ${Date.now() - initAgentStart}ms`);
-    
     // 调用规划Agent的process方法生成计划，传递所有历史消息
     const planStart = Date.now();
+    if (!planningAgent) {
+      throw new Error('PlanningAgent未初始化');
+    }
     const planResult = await planningAgent.process({
       input: allChildMessages.length > 0 ? allChildMessages.join(" ") : lastChildMessage,
       context: {
@@ -259,9 +339,7 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
 ${systemPrompt}
 
 
-Child: ${message}
-
-Sparky:`;
+`;
       
       return prompt;
     };
@@ -271,6 +349,11 @@ Sparky:`;
     const prompt = generatePrompt(lastChildMessage);
     console.log(`[API_PERF] 生成prompt耗时: ${Date.now() - promptStart}ms`);
     
+    // 存入缓存
+    if (cacheKey && prompt) {
+      promptCache.set(cacheKey, prompt);
+    }
+    
     // 返回标准的JSON响应格式
     const responseStart = Date.now();
     res.json({
@@ -279,7 +362,8 @@ Sparky:`;
       msg: "提示生成成功",
       data: {
         prompt,
-        childID
+        childID,
+        fromCache: false
       },
       timestamp: new Date().toISOString(),
     });
