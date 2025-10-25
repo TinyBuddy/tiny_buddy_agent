@@ -771,7 +771,7 @@ export class PlanningAgent implements BaseActor {
 		const { childProfile, conversationHistory, knowledgeBase } = context;
 		const getRecentMessagesTime = Date.now();
 		// 减少处理的消息数量，只保留最近3条
-		const recentMessages = this.getRecentMessages(conversationHistory || [], 3);
+		const recentMessages = this.getRecentMessages(conversationHistory || [], 20);
 		console.log(`[PERF] getRecentMessages 耗时: ${Date.now() - getRecentMessagesTime}ms`);
 		
 		const summarizeKnowledgeTime = Date.now();
