@@ -405,12 +405,7 @@ export const startServer = async () => {
 	console.log(
 		"GET    /api/vocabulary          - 获取儿童词汇表(支持时间区间筛选)",
 	);
-	// mem0相关接口
-	console.log("\nmem0相关接口:");
-	console.log("POST   /v1/memories             - 添加记忆");
-	console.log("DELETE /v1/memories/:memory_id  - 删除记忆");
-	console.log("POST   /v2/memories/search      - 搜索记忆");
-	console.log("PUT    /v1/memories/:memory_id  - 更新记忆");
+	// mem0相关接口（已整合到/api/important-memories）
 
 	// 处理进程终止信号
 	const handleShutdown = async () => {
