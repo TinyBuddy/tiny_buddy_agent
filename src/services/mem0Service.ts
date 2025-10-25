@@ -53,15 +53,20 @@ export interface ImportantMemory {
 
 // 扩展关键信息提取正则表达式 - English patterns
 const INTEREST_PATTERNS = [
+  // 改进的模式：支持更灵活的自然语言表达
+  /I like(?:s)?\s+(.+?)(?:\s+and\s+|\s*$)/gi,  // "I like drawing and playing soccer"
   /like(?:s)?\s+(?:movies|music|games|toys|colors|food|activities|animals):?\s*([^,.;!\n]+)/gi,
   /interested in:?\s*([^,.;!\n]+)/gi,
   /want(?:s)?\s+to\s+([^,.;!\n]+)/gi,
   /hobby(?:ies)?:?\s*([^,.;!\n]+)/gi,
   /favorite(?:s)?(?:\s+thing)?:?\s*([^,.;!\n]+)/gi,
   /enjoy(?:s)?\s+([^,.;!\n]+)/gi,
+  /I enjoy(?:s)?\s+(.+?)(?:\s+and\s+|\s*$)/gi,  // "I enjoy reading books"
 ];
 
 const IMPORTANT_EVENT_PATTERNS = [
+  // 改进的模式：支持自然语言表达
+  /(?:Today is|my|I have a)\s+birthday\s*(.+)?/gi,  // "Today is my birthday"
   /birthday:?\s*([^,.;!\n]+)/gi,
   /exam(?:s)?:?\s*([^,.;!\n]+)/gi,
   /got(?:\s+a)?\s+([^,.;!\n]+)/gi,
@@ -82,6 +87,8 @@ const FAMILY_PATTERNS = [
 ];
 
 const FRIEND_PATTERNS = [
+  // 改进的模式：支持自然语言表达
+  /(?:My|I have a)\s+best friend(?: is)?\s+(.+?)(?:\s+from|\s*$)/gi,  // "My best friend is Tom"
   /friend(?:s)?:?\s*([^,.;!\n]+)/gi,
   /play(?:s)?\s+with\s+([^,.;!\n]+)/gi,
   /study(?:s)?\s+with\s+([^,.;!\n]+)/gi,
