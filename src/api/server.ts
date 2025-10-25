@@ -428,4 +428,12 @@ export const startServer = async () => {
 	return server;
 };
 
+// 如果是直接运行此文件，则启动服务器
+if (import.meta.url === `file://${process.argv[1]}`) {
+  startServer().catch((error) => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  });
+}
+
 export default apiApp;
