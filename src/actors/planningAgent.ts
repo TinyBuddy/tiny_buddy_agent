@@ -441,7 +441,7 @@ export class PlanningAgent implements BaseActor {
 				model: openai("gpt-4.1"),
 				prompt,
 				maxOutputTokens: 1200,
-				temperature: 0.7,
+				temperature: 0.4,
 			});
 
 			// 解析大模型返回的JSON计划
@@ -798,8 +798,8 @@ export class PlanningAgent implements BaseActor {
 			model: openai("gpt-4.1"),
 			prompt,
 			maxOutputTokens: 800, // 减少输出 tokens 数量，从1500降到800
-			temperature: 0.4, // 降低随机性，从0.6降到0.4
-			topP: 0.8, // 添加 top_p 参数以提高效率
+			temperature: 0.3, // 降低随机性，从0.6降到0.4
+			topP: 0.5, // 添加 top_p 参数以提高效率
 		});
 		console.log(`[PERF] LLM调用耗时: ${Date.now() - llmCallTime}ms`);
 
