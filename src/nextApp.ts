@@ -209,6 +209,7 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
     // 验证请求参数
     const { childID, gender, interests, languageLevel, childAge, historyMsgs } = generatePromptSchema.parse(req.body);
     console.log(`[API_PERF] 参数解析与验证耗时: ${Date.now() - parseStart}ms`);
+    console.log("params languageLevel is ", languageLevel)
     
     // 生成缓存键
     const lastChildMsg = historyMsgs.length > 0 ? historyMsgs[historyMsgs.length - 1].child : "Hello";
