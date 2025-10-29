@@ -11,6 +11,8 @@ import type { MemoryService } from "../services/memoryService";
 import type { VocabularyService } from "../services/vocabularyService";
 import { defaultVocabularyService } from "../services/vocabularyService";
 import type { ActorContext, BaseActor } from "./baseActor";
+import fs from 'fs';
+import path from 'path';
 
 // 加载环境变量
 config();
@@ -52,6 +54,7 @@ export class LongtermPlanningAgent implements BaseActor {
 	private memoryService: MemoryService | undefined;
 	private scheduleTimer: NodeJS.Timeout | null = null;
 	private vocabularyService: VocabularyService;
+	public levelStandards: any[] = [];
 	// 保留内存中的词汇存储作为缓存
 	private vocabularyStore: ChineseVocabularyStore = {
 		vocabularyMap: new Map(),
@@ -82,6 +85,9 @@ export class LongtermPlanningAgent implements BaseActor {
 			lastUpdated: new Date(),
 		};
 
+		// 加载分级标准
+		this.loadLevelStandards();
+
 		// 初始化数据库连接
 		try {
 			this.dbInitialized = await testDbConnection();
@@ -99,6 +105,38 @@ export class LongtermPlanningAgent implements BaseActor {
 
 		// 启动周期调度器（每分钟执行一次）
 		this.startPeriodicScheduler();
+	}
+
+	// 加载分级标准
+	public loadLevelStandards(): void {
+		try {
+			const levelFilePath = path.join(__dirname, '../level_speaking.md');
+			if (fs.existsSync(levelFilePath)) {
+				const levelContent = fs.readFileSync(levelFilePath, 'utf-8');
+				this.levelStandards = JSON.parse(levelContent);
+				console.log(`成功加载分级标准，共 ${this.levelStandards.length} 个等级`);
+			} else {
+				console.warn('分级标准文件不存在，将使用默认分级逻辑');
+				// 使用默认的分级标准结构
+				this.levelStandards = [
+					{ stage: 1, name: 'Sound Familiarization', name_cn: '声音熟悉阶段' },
+					{ stage: 2, name: 'Single Words & Echo', name_cn: '单词与模仿' },
+					{ stage: 3, name: 'Early Sentences', name_cn: '简短句子' },
+					{ stage: 4, name: 'Basic Conversation', name_cn: '基本对话' },
+					{ stage: 5, name: 'Early Narrative & Emotion', name_cn: '简单叙述与情绪表达' }
+				];
+			}
+		} catch (error) {
+			console.error('加载分级标准失败:', error);
+			// 使用默认分级标准
+			this.levelStandards = [
+				{ stage: 1, name: 'Sound Familiarization', name_cn: '声音熟悉阶段' },
+				{ stage: 2, name: 'Single Words & Echo', name_cn: '单词与模仿' },
+				{ stage: 3, name: 'Early Sentences', name_cn: '简短句子' },
+				{ stage: 4, name: 'Basic Conversation', name_cn: '基本对话' },
+				{ stage: 5, name: 'Early Narrative & Emotion', name_cn: '简单叙述与情绪表达' }
+			];
+		}
 	}
 
 	// 预加载所有用户的词汇表到内存缓存
@@ -228,6 +266,9 @@ export class LongtermPlanningAgent implements BaseActor {
 			// 5. 提取并存储中文词汇
 			await this.extractAndStoreChineseVocabulary(childId, recentMessages);
 
+			// 6. 计算并更新用户语言分级
+			await this.calculateAndUpdateLanguageLevel(childId, childProfile);
+
 			console.log(`为用户 ${childProfile.name}(${childId}) 生成了长期规划`);
 			console.log(
 				`存储的中文词汇数量: ${this.vocabularyStore.vocabularyMap.get(childId)?.size || 0}`,
@@ -235,6 +276,132 @@ export class LongtermPlanningAgent implements BaseActor {
 		} catch (error) {
 			console.error(`处理用户 ${childId} 失败:`, error);
 		}
+	}
+
+	// 计算并更新用户语言分级
+	private async calculateAndUpdateLanguageLevel(childId: string, childProfile: ChildProfile): Promise<void> {
+		try {
+			console.log(`开始计算用户 ${childId} 的语言分级`);
+
+			// 1. 获取用户最近的对话消息
+			const recentMessages = await this.getRecentMessages(childId, 50);
+			
+			// 2. 使用LLM计算语言分级
+			const calculatedLevel = await this.calculateLanguageLevelWithLLM(
+				childProfile.age,
+				recentMessages,
+				this.levelStandards
+			);
+
+			// 3. 更新用户档案中的语言分级
+			const levelString = `L${calculatedLevel}`; // 格式化为"L1"-"L5"（大写L）
+			if (childProfile.languageLevel !== levelString) {
+				if (this.memoryService) {
+					// 更新用户档案
+					await this.memoryService.updateChildProfile(childId, {
+						languageLevel: levelString
+					});
+					console.log(`更新用户 ${childId} 的语言分级: ${childProfile.languageLevel || '未设置'} -> ${levelString}`);
+				}
+			} else {
+				console.log(`用户 ${childId} 的语言分级保持不变: ${levelString}`);
+			}
+		} catch (error) {
+			console.error(`计算或更新用户 ${childId} 的语言分级失败:`, error);
+		}
+	}
+
+	// 使用LLM计算语言分级
+	public async calculateLanguageLevelWithLLM(age: number, messages: Message[], levelStandards: any[]): Promise<number> {
+		try {
+			// 构建提示词
+			const prompt = this.buildLanguageLevelPrompt(age, messages, levelStandards);
+			
+			// 调用LLM计算分级
+			const response = await generateText({
+				model: openai("gpt-4o"),
+				prompt: prompt,
+				maxOutputTokens: 100,
+				temperature: 0.1
+			});
+			
+			// 解析LLM响应，提取分级数字
+			const level = this.parseLanguageLevelResponse(response.text);
+			
+			console.log(`LLM计算结果: 年龄 ${age}, 语言分级 ${level}`);
+			return level;
+		} catch (error) {
+			console.error("使用LLM计算语言分级失败:", error);
+			// 降级方案：基于年龄的简单分级
+			return this.calculateBaseLevelByAge(age);
+		}
+	}
+
+	// 构建语言分级计算提示词
+	private buildLanguageLevelPrompt(age: number, messages: Message[], levelStandards: any[]): string {
+		// 提取对话历史（保留最新的20条消息）
+		const recentChats = messages.slice(-20).map(msg => {
+			// 假设消息中包含发送者信息，根据实际情况调整
+			const role = 'User message';
+			return `${role}: ${msg.content}`;
+		}).join('\n');
+		
+		// 构建分级标准文本
+		const standardsText = levelStandards.map(standard => {
+			return `L${standard.stage}: ${standard.name_en || standard.name_cn || 'Stage ' + standard.stage}\n` +
+			       `  Focus: ${standard.focus || 'No detailed description'}\n` +
+			       `  Key points: ${(standard.key_points || []).join(', ')}\n` +
+			       `  Target skills: ${(standard.target_skills || []).join(', ')}`;
+		}).join('\n\n');
+		
+		// 构建完整提示词
+		return `Please act as a language development expert and evaluate the language proficiency level (L1-L5) for a ${age}-year-old child based on the following information.
+
+Level Standards:
+${standardsText}
+
+Conversation History Examples:
+${recentChats}
+
+Based on the child's age and language abilities demonstrated in the conversation (including vocabulary, grammatical complexity, expression ability, comprehension ability, etc.), compare with the level standards and provide the most accurate language level.
+
+Please output strictly in the following format (only return a pure number, do not include L or other characters):
+[number]
+
+For example: If evaluated as L3 level, please output: 3
+
+Do not output any explanations or additional information.`;
+	}
+
+	// 解析LLM返回的语言分级
+	private parseLanguageLevelResponse(response: string): number {
+		// 清理响应文本
+		const cleanedResponse = response.trim();
+		
+		// 尝试多种格式匹配：
+		// 1. 直接数字格式："1", "2", ...
+		// 2. 带L格式："L1", "L2", ... 或 "l1", "l2", ...
+		// 3. 中文描述格式："语言级别：1", "L1级", ...
+		
+		// 匹配数字
+		const numMatch = cleanedResponse.match(/(?:L|l)?(\d+)/);
+		if (numMatch && numMatch[1]) {
+			let level = parseInt(numMatch[1], 10);
+			// 确保在1-5范围内
+			return Math.max(1, Math.min(5, level));
+		}
+		
+		// 如果无法解析，返回基于默认年龄的保守估计
+		return 2; // 默认返回L2作为保守估计
+	}
+
+	// 基于年龄的保守分级（降级方案）
+	private calculateBaseLevelByAge(age: number): number {
+		if (age <= 2) return 1;      // 2岁及以下：L1
+		else if (age <= 3) return 2; // 3岁：L2
+		else if (age <= 4) return 3; // 4岁：L3
+		else if (age <= 6) return 4; // 5-6岁：L4
+		else return 5;               // 7岁及以上：L5
 	}
 
 	// 获取用户最近的消息
