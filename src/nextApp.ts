@@ -323,7 +323,7 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
     
     // 实现简化版的prompt生成函数
     const generatePrompt = (message: string) => {
-      const recentMessages = conversationHistory.slice(-5); // 获取最近5条消息
+      const recentMessages = conversationHistory.slice(-20); // 获取最近5条消息
       const chatHistory = recentMessages
         .map((m) => `${m.type === "user" ? "Child" : "Sparky"}: ${m.content}`)
         .join("\n");
