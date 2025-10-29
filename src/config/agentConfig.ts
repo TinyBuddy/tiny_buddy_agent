@@ -119,9 +119,6 @@ The principle you must adhere to: Do not consistently teach in Chinese. For the 
 }
 
 
-
-# history conversations
-
 `
 
 ;
