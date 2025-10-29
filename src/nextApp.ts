@@ -339,7 +339,7 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
 ${systemPrompt}
 
 
-`;
+` + chatHistory;
       
       return prompt;
     };
