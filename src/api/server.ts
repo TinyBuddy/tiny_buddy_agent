@@ -9,6 +9,8 @@ import { db } from "../db/db";
 import { vocabulary } from "../db/schema";
 import type { InMemoryMemoryService } from "../services/memoryService";
 import { mem0Service, type UpdateImportantMemoriesRequest } from "../services/mem0Service";
+import { LongtermPlanningAgent } from "../actors/LongtermPlanningAgent";
+import type { Message } from "../models/message";
 
 // 加载环境变量
 config();
@@ -20,6 +22,14 @@ const apiApp = new Hono();
 const chatRequestSchema = z.object({
 	childId: z.string().optional(),
 	message: z.string().min(1),
+});
+
+// 语言分级测试请求验证模式
+const languageLevelTestRequestSchema = z.object({
+	age: z.number().min(2).max(18),
+	messages: z.array(z.object({
+		content: z.string().min(1)
+	})).min(1)
 });
 
 // 创建默认儿童ID（与app.ts保持一致）
@@ -34,6 +44,67 @@ apiApp.get("/api/health", (c) => {
 		version: "0.1.0",
 		timestamp: new Date().toISOString(),
 	});
+});
+
+// 2. 语言分级测试端点（不持久化数据）
+apiApp.post("/api/test-language-level", async (c) => {
+	try {
+		// 验证请求体
+		const requestBody = await c.req.json();
+		const { age, messages } = languageLevelTestRequestSchema.parse(requestBody);
+
+		console.log(`接收到语言分级测试请求: 年龄 ${age}岁，消息条数 ${messages.length}`);
+
+		// 创建LongtermPlanningAgent实例用于分级计算
+		const planningAgent = new LongtermPlanningAgent({});
+
+		// 确保加载分级标准
+		await planningAgent.loadLevelStandards();
+
+		// 转换消息格式以匹配Message类型
+		const formattedMessages: Message[] = messages.map((msg, index) => ({
+			id: `temp_${index}`,
+			type: 'user',
+			content: msg.content,
+			timestamp: new Date()
+		}));
+
+		// 计算语言分级（使用LLM方法）
+		const level = await planningAgent.calculateLanguageLevelWithLLM(age, formattedMessages, planningAgent.levelStandards);
+
+		// 构建格式化的分级结果
+		const levelString = `L${level}`; // 格式为L1-L5
+
+		// 返回测试结果
+		return c.json({
+			success: true,
+			data: {
+				level: levelString,
+				levelNumber: level,
+				age: age,
+				messageCount: messages.length,
+				confidence: "high", // 可以根据实际计算逻辑调整置信度
+				timestamp: new Date().toISOString()
+			}
+		});
+	} catch (error: any) {
+		console.error("处理语言分级测试请求时出错:", error);
+		
+		if (error.name === "ZodError") {
+			return c.json({
+				success: false,
+				error: "请求参数验证失败: " + error.errors.map((e: any) => e.message).join(", "),
+				timestamp: new Date().toISOString()
+			}, 400);
+		}
+
+		return c.json({
+			success: false,
+			error: "计算语言分级时发生错误",
+			details: error.message,
+			timestamp: new Date().toISOString()
+		}, 500);
+	}
 });
 
 // 2. 处理聊天消息端点（流式响应版本）
