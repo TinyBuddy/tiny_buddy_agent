@@ -340,6 +340,8 @@ ${systemPrompt}
 
 
 ` + chatHistory;
+
+console.log(`[DEBUG] 生成的prompt: ${prompt}`);
       
       return prompt;
     };

@@ -833,23 +833,110 @@ export class PlanningAgent implements BaseActor {
 
 			// 尝试解析清理后的JSON
 			try {
-				const parsedJson = JSON.parse(cleanText);
+				// 检查是否可能包含多个JSON对象（对象之间用逗号分隔的情况）
+				let fixedText = cleanText;
 				
-				// 如果解析结果是数组，取第一个元素
-				if (Array.isArray(parsedJson)) {
-					console.log("检测到数组响应，使用第一个元素作为规划");
-					// 确保数组不为空且第一个元素有效
-					if (parsedJson.length > 0 && parsedJson[0]) {
-						llmPlan = parsedJson[0];
+				// 统计大括号数量，检查是否包含多个对象
+				const openBraces = (fixedText.match(/{/g) || []).length;
+				const closeBraces = (fixedText.match(/}/g) || []).length;
+				
+				// 如果大括号数量匹配但不是单个对象或数组格式，尝试将其转换为数组
+				if (openBraces > 1 && openBraces === closeBraces && 
+					!fixedText.trim().startsWith('[') && 
+					!fixedText.trim().endsWith(']')) {
+					console.log("检测到可能包含多个JSON对象，尝试转换为数组");
+					// 尝试用正则表达式提取所有JSON对象
+					const jsonObjects: any[] = [];
+					let currentObject = '';
+					let braceCount = 0;
+					let inString = false;
+					let escapeNext = false;
+					
+					for (let i = 0; i < fixedText.length; i++) {
+						const char = fixedText[i];
+						
+						// 处理字符串中的特殊字符
+						if (char === '"' && !escapeNext) {
+							inString = !inString;
+						} else if (char === '\\' && inString) {
+							escapeNext = !escapeNext;
+						} else {
+							escapeNext = false;
+						}
+						
+						// 在字符串外才处理大括号
+						if (!inString) {
+							if (char === '{') braceCount++;
+							if (char === '}') braceCount--;
+						}
+						
+						currentObject += char;
+						
+						// 当找到一个完整的对象且后面是逗号或结尾时
+						if (braceCount === 0 && currentObject.trim() && 
+							(i === fixedText.length - 1 || fixedText[i + 1] === ',')) {
+							try {
+								// 尝试解析当前对象
+								const obj = JSON.parse(currentObject.trim());
+								jsonObjects.push(obj);
+								// 跳过下一个逗号
+								if (i < fixedText.length - 1 && fixedText[i + 1] === ',') {
+									i++;
+								}
+								currentObject = '';
+							} catch (e) {
+								// 如果解析失败，继续收集字符
+								continue;
+							}
+						}
+					}
+					
+					// 如果成功提取到对象，使用第一个
+					if (jsonObjects.length > 0) {
+						console.log(`成功提取到 ${jsonObjects.length} 个JSON对象，使用第一个`);
+						llmPlan = jsonObjects[0];
 					} else {
-						return this.createFallbackPlan(context);
+						// 尝试作为单个JSON解析
+						const parsedJson = JSON.parse(cleanText);
+						
+						// 如果解析结果是数组，取第一个元素
+						if (Array.isArray(parsedJson)) {
+							console.log("检测到数组响应，使用第一个元素作为规划");
+							// 确保数组不为空且第一个元素有效
+							if (parsedJson.length > 0 && parsedJson[0]) {
+								llmPlan = parsedJson[0];
+							} else {
+								return this.createFallbackPlan(context);
+							}
+						} else {
+							// 确保parsedJson是对象类型
+							if (typeof parsedJson === 'object' && parsedJson !== null) {
+								llmPlan = parsedJson;
+							} else {
+								return this.createFallbackPlan(context);
+							}
+						}
 					}
 				} else {
-					// 确保parsedJson是对象类型
-					if (typeof parsedJson === 'object' && parsedJson !== null) {
-						llmPlan = parsedJson;
+					// 正常的JSON解析流程
+					const parsedJson = JSON.parse(cleanText);
+					
+					// 如果解析结果是数组，取第一个元素
+					if (Array.isArray(parsedJson)) {
+						console.log("检测到数组响应，使用第一个元素作为规划");
+						// 确保数组不为空且第一个元素有效
+						if (parsedJson.length > 0 && parsedJson[0]) {
+							llmPlan = parsedJson[0];
+						} else {
+							return this.createFallbackPlan(context);
+						}
 					} else {
-						return this.createFallbackPlan(context);
+						// 确保parsedJson是对象类型
+						if (typeof parsedJson === 'object' && parsedJson !== null) {
+							llmPlan = parsedJson;
+						} else {
+							return this.createFallbackPlan(context);
+						}
 					}
 				}
 			} catch (parseError) {
