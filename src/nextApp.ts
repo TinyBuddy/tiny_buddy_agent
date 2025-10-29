@@ -338,7 +338,6 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
       const prompt = `
 ${systemPrompt}
 
-
 ` + chatHistory;
 
 console.log(`[DEBUG] 生成的prompt: ${prompt}`);
