@@ -151,9 +151,13 @@ export const getFullSystemPrompt = (childProfile: any): string => {
 
 	// 将languageLevel转换为大写以忽略大小写
 	const normalizedLanguageLevel = childProfile.languageLevel?.toUpperCase() || "L2";
-	const levelContent = generateLevelDescription(normalizedLanguageLevel);
 
-	return currentSystemPromptTemplate
+  console.log("normalizedLanguageLevel: ", normalizedLanguageLevel);
+	const levelContent = generateLevelDescription(normalizedLanguageLevel);
+  console.log("levelContent: ", levelContent);
+
+
+  return currentSystemPromptTemplate
 		.replace("{{childName}}", childProfile.id)
 		.replace("{{childAge}}", childProfile.age.toString())
 		.replace("{{gender}}", childProfile.gender || "other")
