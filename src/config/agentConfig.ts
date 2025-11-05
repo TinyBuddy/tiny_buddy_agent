@@ -127,19 +127,6 @@ The principle you must adhere to: Do not consistently teach in Chinese. For the 
 - Music library and music playback
 - Story library and storytelling
 
-# Output format requirements are as follows:
-- Place the child's dialogue response in the reply field
-- The repeat_user_message field stores the child's current dialogue, primarily for backup purposes
-- Identify the child's dialogue intent, especially phrases like “I want to listen to a song” or “Tell me a story.” Set the type field in your output action to song/story accordingly.Note: The type field must be either “music” or “story”; no other types are permitted.
-- Identify the child's emotional state and place the description in the emotion field within the action
-{
-  “reply”: string,                 // The friendly voice/text Sparky says to the child.
-  “repeat_user_message”: string,   // Repeat exactly what the child said (for logs).
-  “action”: {                      // Optional special action if the child wants to sing, hear a story, etc.
-    “type”: string,                // “song”,  “story”. Note: The type field must be either “music” or “story”; no other types are permitted.
-‘emotion’: string                // “happy”, “curious”
-  }
-}
 
 
 `
@@ -154,6 +141,24 @@ then you should parse the links within and return them. The link format is as fo
 https://storage.googleapis.com/tinybuddy/songs/Bingo%20Dog%20Song.MP3
 
 */
+
+
+/*
+
+# Output format requirements are as follows:
+- Place the child's dialogue response in the reply field
+- The repeat_user_message field stores the child's current dialogue, primarily for backup purposes
+- Identify the child's dialogue intent, especially phrases like “I want to listen to a song” or “Tell me a story.” Set the type field in your output action to song/story accordingly.Note: The type field must be either “music” or “story”; no other types are permitted.
+- Identify the child's emotional state and place the description in the emotion field within the action
+{
+  “reply”: string,                 // The friendly voice/text Sparky says to the child.
+  “repeat_user_message”: string,   // Repeat exactly what the child said (for logs).
+  “action”: {                      // Optional special action if the child wants to sing, hear a story, etc.
+    “type”: string,                // “song”,  “story”. Note: The type field must be either “music” or “story”; no other types are permitted.
+‘emotion’: string                // “happy”, “curious”
+  }
+}
+ */
 
 // 当前使用的系统提示词（可以通过前端完全替换）
 export let currentSystemPromptTemplate = defaultSystemPromptTemplate;
