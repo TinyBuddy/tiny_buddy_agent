@@ -13,6 +13,7 @@ import { defaultVocabularyService } from "../services/vocabularyService";
 import type { ActorContext, BaseActor } from "./baseActor";
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 // 加载环境变量
 config();
@@ -110,6 +111,9 @@ export class LongtermPlanningAgent implements BaseActor {
 	// 加载分级标准
 	public loadLevelStandards(): void {
 		try {
+			// 在ESM模块中使用import.meta.url替代__dirname
+			const __filename = fileURLToPath(import.meta.url);
+			const __dirname = path.dirname(__filename);
 			const levelFilePath = path.join(__dirname, '../level_speaking.md');
 			if (fs.existsSync(levelFilePath)) {
 				const levelContent = fs.readFileSync(levelFilePath, 'utf-8');
