@@ -32,6 +32,7 @@ export interface UpdateImportantMemoriesRequest {
 
 // 重要记忆信息接口
 export interface ImportantInfo {
+  name?: string;            // 孩子的名字
   interests: string[];      // 兴趣爱好
   importantEvents: string[]; // 重要事件
   familyMembers: string[];   // 家庭成员
@@ -103,6 +104,16 @@ const DREAM_PATTERNS = [
   /ambition:?\s*([^,.;!\n]+)/gi,
 ];
 
+// 名字提取正则表达式模式
+const NAME_PATTERNS = [
+  /My name is\s+([^,.;!\n]+)/gi,
+  /I am\s+([^,.;!\n]+)/gi,
+  /I'm\s+([^,.;!\n]+)/gi,
+  /call me\s+([^,.;!\n]+)/gi,
+  /my name's\s+([^,.;!\n]+)/gi,
+  /name:?\s*([^,.;!\n]+)/gi,
+];
+
 // 第三方系统接口请求定义
 export interface UpdateImportantMemoriesRequest {
   child_id: string;
@@ -133,11 +144,24 @@ export interface ImportantMemory {
 // 提取文本中的关键信息
 function extractImportantInfo(texts: string[]): ImportantInfo {
   const combinedText = texts.join('\n');
+  let name: string | undefined;
   const interests: string[] = [];
   const importantEvents: string[] = [];
   const familyMembers: string[] = [];
   const friends: string[] = [];
   const dreams: string[] = [];
+  
+  // 提取名字
+  NAME_PATTERNS.forEach(pattern => {
+    let match;
+    while ((match = pattern.exec(combinedText)) !== null) {
+      if (match[1]) {
+        // 只取第一个匹配的名字
+        name = match[1].trim();
+        return;
+      }
+    }
+  });
   
   // 提取兴趣爱好
   INTEREST_PATTERNS.forEach(pattern => {
@@ -190,6 +214,7 @@ function extractImportantInfo(texts: string[]): ImportantInfo {
   });
   
   return {
+    name,
     interests: [...new Set(interests)], // 去重
     importantEvents: [...new Set(importantEvents)],
     familyMembers: [...new Set(familyMembers)],
@@ -200,7 +225,8 @@ function extractImportantInfo(texts: string[]): ImportantInfo {
 
 // 检查是否包含重要信息
 function hasImportantInfo(info: ImportantInfo): boolean {
-  return info.interests.length > 0 || 
+  return !!info.name || 
+         info.interests.length > 0 || 
          info.importantEvents.length > 0 || 
          info.familyMembers.length > 0 || 
          info.friends.length > 0 || 
@@ -633,6 +659,10 @@ export class Mem0Service {
   // 生成记忆内容文本 - English version
   private generateMemoryContent(info: ImportantInfo): string {
     let content = `Child Important Information Summary:\n\n`;
+    
+    if (info.name) {
+      content += `Name: ${info.name}\n\n`;
+    }
     
     if (info.interests.length > 0) {
       content += `Interests:\n${info.interests.map(item => `- ${item}`).join('\n')}\n\n`;
