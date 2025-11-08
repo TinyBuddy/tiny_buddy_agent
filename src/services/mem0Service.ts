@@ -210,6 +210,39 @@ export interface ImportantMemory {
 }
 
 // 提取文本中的关键信息
+// 无效词汇列表 - 需要排除的单个字符、标点和无意义词汇
+const INVALID_WORDS = [
+  '?', '!', '.', ',', ';', ':', '-', '_', '+', '=', '*', '/', '\\',
+  'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+  'with', 'by', 'from', 'of', 'is', 'are', 'was', 'were', 'be', 'been',
+  'do', 'does', 'did', 'have', 'has', 'had', 'will', 'would', 'could',
+  'should', 'may', 'might', 'must', 'shall', 'can', 'all', 'most', 'my',
+  'your', 'his', 'her', 'its', 'our', 'their', 'this', 'that', 'these',
+  'those', 'there', 'here', 'Oh', 'Sparky:', 'too?', 'yummy', 'fun', 'things'
+];
+
+// 检查词汇是否有效
+function isValidInterest(word: string): boolean {
+  // 排除空字符串、单个字符、无效词汇和标点符号
+  if (!word || word.length <= 1 || INVALID_WORDS.includes(word) || /^[?.,!;:]$/.test(word)) {
+    return false;
+  }
+  // 排除纯数字
+  if (/^\d+$/.test(word)) {
+    return false;
+  }
+  // 排除包含特殊字符的词汇
+  if (/[?.,!;:]$/.test(word)) {
+    return false;
+  }
+  return true;
+}
+
+// 清理词汇 - 移除末尾标点符号等
+function cleanWord(word: string): string {
+  return word.replace(/[?.,!;:]$/, '').trim();
+}
+
 function extractImportantInfo(texts: string[]): ImportantInfo {
   const combinedText = texts.join('\n');
   let name: string | undefined;
@@ -241,7 +274,10 @@ function extractImportantInfo(texts: string[]): ImportantInfo {
         if (GENERIC_CATEGORIES.includes(interestText.toLowerCase())) {
           continue;
         }
-        interests.push(interestText);
+        // 只添加有效的兴趣
+        if (isValidInterest(interestText)) {
+          interests.push(interestText);
+        }
       }
     }
   });
@@ -259,9 +295,10 @@ function extractImportantInfo(texts: string[]): ImportantInfo {
           // 分割可能包含多个项目的文本
           const parts = text.split(/[,;\s]+/);
           parts.forEach(part => {
-            const trimmedPart = part.trim();
-            if (trimmedPart && !GENERIC_CATEGORIES.includes(trimmedPart.toLowerCase())) {
-              interests.push(trimmedPart);
+            const cleanedPart = cleanWord(part.trim());
+            if (cleanedPart && !GENERIC_CATEGORIES.includes(cleanedPart.toLowerCase()) && 
+                isValidInterest(cleanedPart)) {
+              interests.push(cleanedPart);
             }
           });
         }
@@ -270,21 +307,23 @@ function extractImportantInfo(texts: string[]): ImportantInfo {
   });
   
   // 额外检查：从文本中提取常见兴趣词汇
-  Object.values(COMMON_INTERESTS).forEach(interestList => {
-    interestList.forEach(interest => {
-      // 使用边界匹配确保我们找到的是完整的兴趣单词
-      const regex = new RegExp(`\\b${interest}\\b`, 'i');
-      if (regex.test(lowerText)) {
-        // 转换为单数形式（简单处理）
-        let singularInterest = interest;
-        if (interest.endsWith('ies')) {
-          singularInterest = interest.slice(0, -3) + 'y'; // 将kitties转换为kitty
-        } else if (interest.endsWith('s') && !['fish', 'sheep', 'sports'].includes(interest)) {
-          singularInterest = interest.slice(0, -1); // 将dogs转换为dog
-        }
+  const allCommonInterests = Object.values(COMMON_INTERESTS).flat();
+  allCommonInterests.forEach(interest => {
+    // 使用边界匹配确保我们找到的是完整的兴趣单词
+    const regex = new RegExp(`\\b${interest}\\b`, 'i');
+    if (regex.test(lowerText)) {
+      // 转换为单数形式（简单处理）
+      let singularInterest = interest;
+      if (interest.endsWith('ies')) {
+        singularInterest = interest.slice(0, -3) + 'y'; // 将kitties转换为kitty
+      } else if (interest.endsWith('s') && !['fish', 'sheep', 'sports'].includes(interest)) {
+        singularInterest = interest.slice(0, -1); // 将dogs转换为dog
+      }
+      // 只添加有效的兴趣
+      if (isValidInterest(singularInterest)) {
         interests.push(singularInterest);
       }
-    });
+    }
   });
   
   // 特殊处理：提取"I like ..."模式中的具体兴趣
@@ -296,9 +335,10 @@ function extractImportantInfo(texts: string[]): ImportantInfo {
       // 处理"I like A and B"或"I like A, B"格式
       const items = likes.split(/\s+and\s+|[,;\s]+/);
       items.forEach(item => {
-        const trimmedItem = item.trim();
-        if (trimmedItem && !GENERIC_CATEGORIES.includes(trimmedItem.toLowerCase())) {
-          interests.push(trimmedItem);
+        const cleanedItem = cleanWord(item.trim());
+        if (cleanedItem && !GENERIC_CATEGORIES.includes(cleanedItem.toLowerCase()) && 
+            isValidInterest(cleanedItem)) {
+          interests.push(cleanedItem);
         }
       });
     }
@@ -309,7 +349,10 @@ function extractImportantInfo(texts: string[]): ImportantInfo {
     let match;
     while ((match = pattern.exec(combinedText)) !== null) {
       if (match[1]) {
-        importantEvents.push(match[1].trim());
+        const eventText = match[1].trim();
+        if (eventText && eventText.length > 2) {
+          importantEvents.push(eventText);
+        }
       }
     }
   });
@@ -319,7 +362,10 @@ function extractImportantInfo(texts: string[]): ImportantInfo {
     let match;
     while ((match = pattern.exec(combinedText)) !== null) {
       if (match[1]) {
-        familyMembers.push(match[1].trim());
+        const familyText = match[1].trim();
+        if (familyText && familyText.length > 1) {
+          familyMembers.push(familyText);
+        }
       }
     }
   });
@@ -329,7 +375,12 @@ function extractImportantInfo(texts: string[]): ImportantInfo {
     let match;
     while ((match = pattern.exec(combinedText)) !== null) {
       if (match[1]) {
-        friends.push(match[1].trim());
+        const friendText = match[1].trim();
+        // 排除无意义的朋友描述
+        if (friendText && friendText.length > 2 && 
+            !INVALID_WORDS.some(invalid => friendText.includes(invalid))) {
+          friends.push(friendText);
+        }
       }
     }
   });
@@ -339,7 +390,10 @@ function extractImportantInfo(texts: string[]): ImportantInfo {
     let match;
     while ((match = pattern.exec(combinedText)) !== null) {
       if (match[1]) {
-        dreams.push(match[1].trim());
+        const dreamText = match[1].trim();
+        if (dreamText && dreamText.length > 2) {
+          dreams.push(dreamText);
+        }
       }
     }
   });
