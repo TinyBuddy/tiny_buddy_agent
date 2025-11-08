@@ -274,19 +274,28 @@ async function extractImportantInfoWithAI(texts: string[]): Promise<ImportantInf
       messages: [
         {
           role: 'system',
-          content: `You are an assistant specialized in extracting important information about children from conversation records. Please extract the following information strictly according to requirements:
-          1. name: The child's name
-          2. interests: The child's hobbies and interests (extract only specific interests, not phrases or sentences, exclude emojis and meaningless words)
-          3. importantEvents: Important events
-          4. familyMembers: Family members
-          5. friends: Friends (extract only actual names, not descriptive phrases)
-          6. dreams: Dreams and aspirations
+          content: `You are a precise information extraction assistant specialized in extracting detailed information about children from conversation records. Please extract the following information with specific details:
           
-          Please return strictly in JSON format without any explanation or additional text. Each category should only include specific, valid items, excluding general terms and meaningless content.`
+          1. name: The child's full name
+          2. interests: Specific hobbies and interests with details (e.g., "playing basketball", "reading books", "painting") - extract exact activities, not general categories
+          3. importantEvents: Important events with specific details (e.g., "Birthday on June 15, 2015", "Won the school spelling bee") - include dates when mentioned
+          4. familyMembers: Family members with relationships (e.g., "mom Sarah", "brother Tom")
+          5. friends: Friends with actual names (e.g., "Tom", "Emma") - extract only real names
+          6. dreams: Specific dreams and aspirations (e.g., "want to be a doctor", "want to travel to Mars")
+          
+          IMPORTANT INSTRUCTIONS:
+          - Extract SPECIFIC details, not general terms
+          - For birthdays, include the exact date (year, month, day) if mentioned
+          - For interests, include the specific activity (e.g., "playing basketball" instead of just "sports")
+          - Ensure each item is a discrete, meaningful piece of information
+          - Include proper nouns, specific dates, and concrete activities
+          - Exclude emojis, articles, and meaningless words
+          
+          Return ONLY a valid JSON object with the six fields. Do not include any explanations or additional text outside the JSON.`
         },
         {
           role: 'user',
-          content: `从以下对话中提取孩子的重要信息：\n${combinedText}`
+          content: `Extract detailed information about the child from the following conversation:\n${combinedText}`
         }
       ],
       response_format: { type: 'json_object' }
@@ -296,13 +305,38 @@ async function extractImportantInfoWithAI(texts: string[]): Promise<ImportantInf
     const aiResult = JSON.parse(completion.choices[0].message.content || '{}');
     
     // 确保返回的数据符合ImportantInfo接口
+    // 优化过滤逻辑，避免过滤掉有效信息
     return {
       name: aiResult.name?.trim() || undefined,
-      interests: aiResult.interests?.filter((item: string) => isValidInterest(item)) || [],
-      importantEvents: aiResult.importantEvents?.filter((item: string) => item && item.length > 2) || [],
-      familyMembers: aiResult.familyMembers?.filter((item: string) => item && item.length > 1) || [],
-      friends: aiResult.friends?.filter((item: string) => item && item.length > 2 && !INVALID_WORDS.some(w => item.toLowerCase().includes(w))) || [],
-      dreams: aiResult.dreams?.filter((item: string) => item && item.length > 2) || []
+      interests: aiResult.interests?.filter((item: string) => {
+        if (!item || typeof item !== 'string' || item.trim().length < 2) return false;
+        // 允许更详细的兴趣描述，如"playing basketball"
+        const cleanedItem = item.trim().toLowerCase();
+        // 移除emoji
+        const withoutEmoji = cleanedItem.replace(EMOJI_REGEX, '').trim();
+        // 检查是否只包含无效词
+        const words = withoutEmoji.split(/\s+/);
+        return words.some(word => !INVALID_WORDS.includes(word.toLowerCase()));
+      }) || [],
+      importantEvents: aiResult.importantEvents?.filter((item: string) => {
+        if (!item || typeof item !== 'string') return false;
+        const cleanedItem = item.trim();
+        // 允许更短但有意义的事件描述，特别是包含日期的
+        return cleanedItem.length > 2 || /\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4}/.test(cleanedItem);
+      }) || [],
+      familyMembers: aiResult.familyMembers?.filter((item: string) => {
+        if (!item || typeof item !== 'string') return false;
+        return item.trim().length > 1;
+      }) || [],
+      friends: aiResult.friends?.filter((item: string) => {
+        if (!item || typeof item !== 'string') return false;
+        const cleanedItem = item.trim();
+        return cleanedItem.length > 1 && !INVALID_WORDS.includes(cleanedItem.toLowerCase());
+      }) || [],
+      dreams: aiResult.dreams?.filter((item: string) => {
+        if (!item || typeof item !== 'string') return false;
+        return item.trim().length > 2;
+      }) || []
     };
   } catch (error) {
     console.error('OpenAI API调用失败，将回退到正则表达式提取:', error);
