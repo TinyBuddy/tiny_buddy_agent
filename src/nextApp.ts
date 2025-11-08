@@ -284,8 +284,11 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
     
     // 从历史消息中提取重要记忆并写入mem0
     try {
-      // 转换为mem0所需的chat_history格式（只取孩子的消息）
-      const chatHistoryForMem0 = historyMsgs.map(msg => msg.child);
+      // 转换为mem0所需的chat_history格式（包含孩子和助手的对话，以便更完整地提取上下文）
+      const chatHistoryForMem0 = historyMsgs.flatMap(msg => [
+        `Child: ${msg.child}`,
+        msg.AI ? `Sparky: ${msg.AI}` : ''
+      ]).filter(text => text.trim());
       
       console.log(`处理儿童 ${childID} 的历史记忆，准备提取重要信息`);
       
@@ -357,35 +360,41 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
         console.log(`从mem0读取儿童 ${childID} 的重要记忆`);
         const memories = await mem0Service.search('*', {
           user_id: childID,
-          limit: 1
+          limit: 1 // 系统设计是每个child_id只有一条完整的综合记忆记录
         });
         
         if (memories.length > 0 && memories[0].metadata && memories[0].metadata.important_info) {
           const importantInfo = memories[0].metadata.important_info;
           let importantMemoriesText = "\n\n# Child's Important Memories\n";
           
+          // 完整提取所有重要记忆字段
           if (importantInfo.name) {
             importantMemoriesText += `\n- Child's name: ${importantInfo.name}`;
           }
           
-          if (importantInfo.familyMembers.length > 0) {
+          if (importantInfo.familyMembers && importantInfo.familyMembers.length > 0) {
             importantMemoriesText += `\n\n- Family members: ${importantInfo.familyMembers.join(', ')}`;
           }
           
-          if (importantInfo.friends.length > 0) {
+          if (importantInfo.friends && importantInfo.friends.length > 0) {
             importantMemoriesText += `\n\n- Friends: ${importantInfo.friends.join(', ')}`;
           }
           
-          if (importantInfo.interests.length > 0) {
+          if (importantInfo.interests && importantInfo.interests.length > 0) {
             importantMemoriesText += `\n\n- Interests: ${importantInfo.interests.join(', ')}`;
           }
           
-          if (importantInfo.importantEvents.length > 0) {
+          if (importantInfo.importantEvents && importantInfo.importantEvents.length > 0) {
             importantMemoriesText += `\n\n- Important events: ${importantInfo.importantEvents.join(', ')}`;
           }
           
-          if (importantInfo.dreams.length > 0) {
+          if (importantInfo.dreams && importantInfo.dreams.length > 0) {
             importantMemoriesText += `\n\n- Dreams: ${importantInfo.dreams.join(', ')}`;
+          }
+          
+          // 额外添加完整的记忆内容，确保不丢失任何信息
+          if (memories[0].content) {
+            importantMemoriesText += `\n\n## Complete Memory Content:\n${memories[0].content}`;
           }
           
           systemPrompt += importantMemoriesText;
