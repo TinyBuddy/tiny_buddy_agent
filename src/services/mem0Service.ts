@@ -65,6 +65,74 @@ const INTEREST_PATTERNS = [
   /I enjoy(?:s)?\s+(.+?)(?:\s+and\s+|\s*$)/gi,  // "I enjoy reading books"
 ];
 
+// 兴趣类别提取正则表达式
+const CATEGORY_SPECIFIC_PATTERNS = {
+  animals: [
+    /I like(?:s)?\s+(dogs|cats|birds|fish|tigers|lions|elephants|monkeys|dolphins|penguins|pandas|zebras|giraffes|horses|cows|sheep|rabbits|foxes|bears|koalas)/gi,
+    /favorite\s+animal(?:s)?:?\s*([^,.;!\n]+)/gi,
+    /like(?:s)?\s+(?:pet|animal)s?:?\s*([^,.;!\n]+)/gi,
+    /love\s+(?:pet|animal)s?:?\s*([^,.;!\n]+)/gi,
+    /interested in\s+(?:pet|animal)s?:?\s*([^,.;!\n]+)/gi,
+  ],
+  sports: [
+    /I like(?:s)?\s+(soccer|football|basketball|baseball|tennis|swimming|running|cycling|dancing|gymnastics)/gi,
+    /favorite\s+sport(?:s)?:?\s*([^,.;!\n]+)/gi,
+    /like(?:s)?\s+playing\s+([^,.;!\n]+)/gi,
+    /love\s+playing\s+([^,.;!\n]+)/gi,
+    /enjoy\s+playing\s+([^,.;!\n]+)/gi,
+  ],
+  games: [
+    /I like(?:s)?\s+(video games|board games|card games|puzzles|hide and seek|tag|chess|checkers)/gi,
+    /favorite\s+game(?:s)?:?\s*([^,.;!\n]+)/gi,
+    /like(?:s)?\s+playing\s+(?:video|computer)\s*games?:?\s*([^,.;!\n]+)?/gi,
+    /love\s+playing\s+(?:video|computer)\s*games?:?\s*([^,.;!\n]+)?/gi,
+  ],
+  activities: [
+    /I like(?:s)?\s+(drawing|painting|singing|dancing|reading|writing|cooking|crafts|hiking|camping)/gi,
+    /favorite\s+activity(?:ies)?:?\s*([^,.;!\n]+)/gi,
+    /like(?:s)?\s+to\s+([^,.;!\n]+)/gi,
+    /enjoy\s+([^,.;!\n]+)/gi,
+  ],
+  foods: [
+    /I like(?:s)?\s+(pizza|ice cream|chocolate|cake|fruits|vegetables|cookies|burgers|pasta)/gi,
+    /favorite\s+food(?:s)?:?\s*([^,.;!\n]+)/gi,
+    /like(?:s)?\s+to\s+eat\s+([^,.;!\n]+)/gi,
+    /love\s+([^,.;!\n]+)/gi,
+  ]
+};
+
+// 常见兴趣词汇列表
+const COMMON_INTERESTS = {
+  animals: [
+    'dog', 'cat', 'bird', 'fish', 'tiger', 'lion', 'elephant', 'monkey', 'dolphin', 'penguin',
+    'panda', 'zebra', 'giraffe', 'horse', 'cow', 'sheep', 'rabbit', 'fox', 'bear', 'koala',
+    'doggy', 'puppy', 'kitten', 'kitty', 'bunny', 'puppies', 'kittens', 'dogs', 'cats', 'birds', 'dinosaur'
+  ],
+  sports: [
+    'soccer', 'football', 'basketball', 'baseball', 'tennis', 'swimming', 'running', 'cycling', 
+    'dancing', 'gymnastics', 'volleyball', 'hockey', 'golf', 'martial arts', 'yoga', 'karate',
+    'basketball', 'baseballs', 'footballs', 'soccer balls'
+  ],
+  games: [
+    'video game', 'board game', 'card game', 'puzzle', 'hide and seek', 'tag', 'chess', 'checkers',
+    'minecraft', 'roblox', 'legos', 'lego', 'blocks', 'puzzles', 'board games', 'video games'
+  ],
+  activities: [
+    'drawing', 'painting', 'singing', 'dancing', 'reading', 'writing', 'cooking', 'crafts', 
+    'hiking', 'camping', 'swimming', 'biking', 'skating', 'skiing', 'drawing pictures', 'coloring'
+  ],
+  foods: [
+    'pizza', 'ice cream', 'chocolate', 'cake', 'fruit', 'vegetable', 'cookie', 'burger', 'pasta',
+    'apples', 'bananas', 'oranges', 'strawberries', 'chicken', 'rice', 'noodles', 'soup'
+  ]
+};
+
+// 需要跳过的通用类别
+const GENERIC_CATEGORIES = [
+  'animals', 'animal', 'sports', 'sport', 'games', 'game', 
+  'activities', 'activity', 'foods', 'food'
+];
+
 const IMPORTANT_EVENT_PATTERNS = [
   // 改进的模式：支持自然语言表达
   /(?:Today is|my|I have a)\s+birthday\s*(.+)?/gi,  // "Today is my birthday"
@@ -168,10 +236,73 @@ function extractImportantInfo(texts: string[]): ImportantInfo {
     let match;
     while ((match = pattern.exec(combinedText)) !== null) {
       if (match[1]) {
-        interests.push(match[1].trim());
+        const interestText = match[1].trim();
+        // 如果兴趣文本是通用类别，跳过，稍后通过专门的模式提取具体内容
+        if (GENERIC_CATEGORIES.includes(interestText.toLowerCase())) {
+          continue;
+        }
+        interests.push(interestText);
       }
     }
   });
+  
+  // 专门提取各类别的具体内容
+  const lowerText = combinedText.toLowerCase();
+  
+  // 处理每个兴趣类别
+  Object.entries(CATEGORY_SPECIFIC_PATTERNS).forEach(([category, patterns]) => {
+    patterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(combinedText)) !== null) {
+        if (match[1]) {
+          const text = match[1].trim();
+          // 分割可能包含多个项目的文本
+          const parts = text.split(/[,;\s]+/);
+          parts.forEach(part => {
+            const trimmedPart = part.trim();
+            if (trimmedPart && !GENERIC_CATEGORIES.includes(trimmedPart.toLowerCase())) {
+              interests.push(trimmedPart);
+            }
+          });
+        }
+      }
+    });
+  });
+  
+  // 额外检查：从文本中提取常见兴趣词汇
+  Object.values(COMMON_INTERESTS).forEach(interestList => {
+    interestList.forEach(interest => {
+      // 使用边界匹配确保我们找到的是完整的兴趣单词
+      const regex = new RegExp(`\\b${interest}\\b`, 'i');
+      if (regex.test(lowerText)) {
+        // 转换为单数形式（简单处理）
+        let singularInterest = interest;
+        if (interest.endsWith('ies')) {
+          singularInterest = interest.slice(0, -3) + 'y'; // 将kitties转换为kitty
+        } else if (interest.endsWith('s') && !['fish', 'sheep', 'sports'].includes(interest)) {
+          singularInterest = interest.slice(0, -1); // 将dogs转换为dog
+        }
+        interests.push(singularInterest);
+      }
+    });
+  });
+  
+  // 特殊处理：提取"I like ..."模式中的具体兴趣
+  const likePattern = /I like(?:s)?\s+([^,.;!\n]+)/gi;
+  let likeMatch;
+  while ((likeMatch = likePattern.exec(combinedText)) !== null) {
+    if (likeMatch[1]) {
+      const likes = likeMatch[1].trim();
+      // 处理"I like A and B"或"I like A, B"格式
+      const items = likes.split(/\s+and\s+|[,;\s]+/);
+      items.forEach(item => {
+        const trimmedItem = item.trim();
+        if (trimmedItem && !GENERIC_CATEGORIES.includes(trimmedItem.toLowerCase())) {
+          interests.push(trimmedItem);
+        }
+      });
+    }
+  };
   
   // 提取重要事件
   IMPORTANT_EVENT_PATTERNS.forEach(pattern => {
@@ -375,24 +506,37 @@ export class Mem0Service {
     }
   }
   
-  // 更新特定记忆（内部方法，保持向后兼容）
-  private async updateMemory(memoryId: string, data: {
-    content: string;
-    metadata: any;
-    tags?: string[];
-  }): Promise<any> {
+  // 获取特定孩子的所有重要记忆 - 公共方法
+  async getImportantMemoriesByChildId(child_id: string): Promise<ImportantMemory[]> {
     try {
-      // 使用新的update方法
-      return await this.update(memoryId, {
+      console.log(`获取child_id: ${child_id} 的所有重要记忆`);
+      
+      // 使用search方法搜索特定child_id的所有记忆
+      const memories = await this.search('*', {
+        user_id: child_id,
+        limit: 100,
         metadata: {
-          ...data.metadata,
-          content: data.content,
-          updated_at: new Date().toISOString()
+          agent_id: AGENT_ID,
+          child_id: child_id
         }
       });
+      
+      console.log(`总共搜索到 ${memories.length} 个记忆项`);
+      
+      // 转换并过滤记忆，只返回包含important_info的记忆
+      const importantMemories = memories.map((item: any) => ({
+        id: item.id,
+        content: item.memory || item.text || item.content || '',
+        metadata: item.metadata || {}
+      })).filter((mem: ImportantMemory) => 
+        mem.metadata && mem.metadata.important_info
+      );
+      
+      console.log(`其中包含重要记忆的有 ${importantMemories.length} 个`);
+      return importantMemories;
     } catch (error) {
-      console.error(`更新记忆失败 (ID: ${memoryId}):`, error);
-      throw error;
+      console.error(`获取孩子重要记忆失败 (child_id: ${child_id}):`, error);
+      return [];
     }
   }
 
@@ -483,15 +627,14 @@ export class Mem0Service {
         const metadata = {
           ...existingMemories[0].metadata,
           important_info: finalImportantInfo,
-          updated_at: timestamp
+          created_at: existingMemories[0].metadata?.created_at || timestamp,
+          updated_at: timestamp,
+          child_id: child_id
         };
         
         // 使用新的update接口更新记忆
         const updatedMemory = await this.update(existingMemories[0].id, {
-          metadata: {
-            ...metadata,
-            content: memoryContent
-          }
+          metadata: metadata
         });
         
         // 删除其他可能存在的旧记忆（如果有多个）
@@ -516,10 +659,11 @@ export class Mem0Service {
       
       const timestamp = new Date().toISOString();
       const metadata = {
-        child_id,
+        child_id: child_id,
         important_info: finalImportantInfo,
         created_at: timestamp,
-        updated_at: timestamp
+        updated_at: timestamp,
+        agent_id: AGENT_ID
       };
       
       // 使用新的add方法创建记忆
@@ -527,13 +671,10 @@ export class Mem0Service {
         { role: 'user' as const, content: memoryContent }
       ];
       
-      console.log('创建新记忆数据:', { child_id, memoryContent_length: memoryContent.length });
+      console.log('创建新记忆数据:', { child_id, memoryContent_length: memoryContent.length, hasImportantInfo: hasImportantInfo(finalImportantInfo) });
       const addResult = await this.add(messages, {
         user_id: child_id,
-        metadata: {
-          ...metadata,
-          content: memoryContent
-        }
+        metadata: metadata
       });
       
       const memoryId = addResult[0]?.id;
@@ -592,39 +733,6 @@ export class Mem0Service {
         error_code: 'UNKNOWN_ERROR',
         error_details: error.message
       };
-    }
-  }
-  
-  // 搜索特定孩子的重要记忆（内部方法，保持向后兼容）
-  private async searchImportantMemories(child_id: string): Promise<ImportantMemory[]> {
-    try {
-      // 使用新的search方法
-      const memories = await this.search('*', {
-        user_id: child_id,
-        limit: 10
-      });
-      
-      return memories.map((item: any) => ({
-        id: item.id,
-        content: item.memory || item.text || item.content || '',
-        metadata: item.metadata || {}
-      })).filter((mem: ImportantMemory) => 
-        mem.metadata && mem.metadata.important_info
-      );
-    } catch (error) {
-      console.error('搜索重要记忆失败:', error);
-      return [];
-    }
-  }
-  
-  // 删除特定记忆
-  private async deleteMemory(memoryId: string): Promise<void> {
-    try {
-      // 使用官方SDK的delete方法
-      await this.delete(memoryId);
-    } catch (error) {
-      console.error(`删除记忆失败 (ID: ${memoryId}):`, error);
-      // 忽略删除错误，继续执行
     }
   }
   
