@@ -1,4 +1,25 @@
 import MemoryClient from 'mem0ai';
+import OpenAI from 'openai';
+
+// OpenAI客户端配置
+let openaiClient: OpenAI | null = null;
+
+// 获取OpenAI客户端实例的函数
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    
+    // 验证必要的配置
+    if (!OPENAI_API_KEY) {
+      console.error('警告: 未配置OpenAI API密钥，请检查OPENAI_API_KEY环境变量');
+    }
+    
+    openaiClient = new OpenAI({
+      apiKey: OPENAI_API_KEY || ''
+    });
+  }
+  return openaiClient;
+}
 
 // mem0 API配置 - 在类内部动态获取
 let mem0Client: MemoryClient | null = null;
@@ -188,14 +209,7 @@ export interface UpdateImportantMemoriesRequest {
   chat_history: string[]; // 历史对话记录数组
 }
 
-// 重要记忆信息接口
-export interface ImportantInfo {
-  interests: string[];      // 兴趣爱好
-  importantEvents: string[]; // 重要事件
-  familyMembers: string[];   // 家庭成员
-  friends: string[];         // 朋友伙伴
-  dreams: string[];          // 理想梦想
-}
+// 重要记忆信息接口已在文件顶部定义
 
 // 记忆存储接口
 export interface ImportantMemory {
@@ -218,13 +232,20 @@ const INVALID_WORDS = [
   'do', 'does', 'did', 'have', 'has', 'had', 'will', 'would', 'could',
   'should', 'may', 'might', 'must', 'shall', 'can', 'all', 'most', 'my',
   'your', 'his', 'her', 'its', 'our', 'their', 'this', 'that', 'these',
-  'those', 'there', 'here', 'Oh', 'Sparky:', 'too?', 'yummy', 'fun', 'things'
+  'those', 'there', 'here', 'Oh', 'Sparky:', 'too', 'too?', 'yummy', 'fun', 
+  'things', 'making', 'happy', 'sounds', 'hear', 'fun', 'song', 'rain', 'about'
 ];
+
+// 过滤掉emoji的正则表达式
+const EMOJI_REGEX = /[\u{1F300}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}]/gu;
 
 // 检查词汇是否有效
 function isValidInterest(word: string): boolean {
+  // 移除emoji
+  word = word.replace(EMOJI_REGEX, '').trim();
+  
   // 排除空字符串、单个字符、无效词汇和标点符号
-  if (!word || word.length <= 1 || INVALID_WORDS.includes(word) || /^[?.,!;:]$/.test(word)) {
+  if (!word || word.length <= 1 || INVALID_WORDS.includes(word.toLowerCase()) || /^[?.,!;:]$/.test(word)) {
     return false;
   }
   // 排除纯数字
@@ -238,12 +259,60 @@ function isValidInterest(word: string): boolean {
   return true;
 }
 
-// 清理词汇 - 移除末尾标点符号等
+// 清理词汇 - 移除末尾标点符号、emoji等
 function cleanWord(word: string): string {
-  return word.replace(/[?.,!;:]$/, '').trim();
+  return word.replace(EMOJI_REGEX, '').replace(/[?.,!;:]$/, '').trim();
 }
 
-function extractImportantInfo(texts: string[]): ImportantInfo {
+// 使用OpenAI API提取重要信息的异步函数
+async function extractImportantInfoWithAI(texts: string[]): Promise<ImportantInfo> {
+  try {
+    const combinedText = texts.join('\n');
+    
+    const completion = await getOpenAIClient().chat.completions.create({
+      model: 'gpt-4.1',
+      messages: [
+        {
+          role: 'system',
+          content: `You are an assistant specialized in extracting important information about children from conversation records. Please extract the following information strictly according to requirements:
+          1. name: The child's name
+          2. interests: The child's hobbies and interests (extract only specific interests, not phrases or sentences, exclude emojis and meaningless words)
+          3. importantEvents: Important events
+          4. familyMembers: Family members
+          5. friends: Friends (extract only actual names, not descriptive phrases)
+          6. dreams: Dreams and aspirations
+          
+          Please return strictly in JSON format without any explanation or additional text. Each category should only include specific, valid items, excluding general terms and meaningless content.`
+        },
+        {
+          role: 'user',
+          content: `从以下对话中提取孩子的重要信息：\n${combinedText}`
+        }
+      ],
+      response_format: { type: 'json_object' }
+    });
+    
+    // 解析AI返回的JSON
+    const aiResult = JSON.parse(completion.choices[0].message.content || '{}');
+    
+    // 确保返回的数据符合ImportantInfo接口
+    return {
+      name: aiResult.name?.trim() || undefined,
+      interests: aiResult.interests?.filter((item: string) => isValidInterest(item)) || [],
+      importantEvents: aiResult.importantEvents?.filter((item: string) => item && item.length > 2) || [],
+      familyMembers: aiResult.familyMembers?.filter((item: string) => item && item.length > 1) || [],
+      friends: aiResult.friends?.filter((item: string) => item && item.length > 2 && !INVALID_WORDS.some(w => item.toLowerCase().includes(w))) || [],
+      dreams: aiResult.dreams?.filter((item: string) => item && item.length > 2) || []
+    };
+  } catch (error) {
+    console.error('OpenAI API调用失败，将回退到正则表达式提取:', error);
+    // 回退到传统的正则表达式提取方法
+    return extractImportantInfoWithRegex(texts);
+  }
+}
+
+// 使用正则表达式提取重要信息的备用函数
+function extractImportantInfoWithRegex(texts: string[]): ImportantInfo {
   const combinedText = texts.join('\n');
   let name: string | undefined;
   const interests: string[] = [];
@@ -370,15 +439,16 @@ function extractImportantInfo(texts: string[]): ImportantInfo {
     }
   });
   
-  // 提取朋友伙伴
+  // 提取朋友伙伴 - 更严格的过滤，只接受人名
   FRIEND_PATTERNS.forEach(pattern => {
     let match;
     while ((match = pattern.exec(combinedText)) !== null) {
       if (match[1]) {
         const friendText = match[1].trim();
-        // 排除无意义的朋友描述
+        // 更严格的过滤：排除短语和描述，只接受可能的人名
         if (friendText && friendText.length > 2 && 
-            !INVALID_WORDS.some(invalid => friendText.includes(invalid))) {
+            !INVALID_WORDS.some(invalid => friendText.toLowerCase().includes(invalid)) &&
+            /^[a-zA-Z]+(?:\s+[a-zA-Z]+)?$/.test(friendText)) {
           friends.push(friendText);
         }
       }
@@ -406,6 +476,12 @@ function extractImportantInfo(texts: string[]): ImportantInfo {
     friends: [...new Set(friends)],
     dreams: [...new Set(dreams)]
   };
+}
+
+// 主提取函数 - 默认使用AI提取
+async function extractImportantInfo(texts: string[]): Promise<ImportantInfo> {
+  // 首先尝试使用AI提取
+  return await extractImportantInfoWithAI(texts);
 }
 
 // 检查是否包含重要信息
@@ -615,8 +691,11 @@ export class Mem0Service {
     try {
       const { child_id, chat_history } = req;
       
-      // 1. 提取新的重要信息
-      const newImportantInfo = extractImportantInfo(chat_history);
+      console.log(`开始更新孩子 ${child_id} 的重要记忆`);
+      
+      // 1. 提取新的重要信息 - 使用异步方法
+      const newImportantInfo = await extractImportantInfo(chat_history);
+      console.log('提取到的重要信息:', JSON.stringify(newImportantInfo));
       
       // 如果没有提取到重要信息，尝试返回历史重要信息
       if (!hasImportantInfo(newImportantInfo)) {
@@ -793,6 +872,7 @@ export class Mem0Service {
   // 合并多个重要信息对象
   private mergeImportantInfo(infoList: ImportantInfo[]): ImportantInfo {
     const merged: ImportantInfo = {
+      name: undefined,
       interests: [],
       importantEvents: [],
       familyMembers: [],
@@ -800,16 +880,49 @@ export class Mem0Service {
       dreams: []
     };
     
+    // 首先找到第一个非空的name
+    for (const info of infoList) {
+      if (info.name && info.name.trim()) {
+        merged.name = info.name.trim();
+        break;
+      }
+    }
+    
     infoList.forEach(info => {
-      merged.interests.push(...info.interests);
-      merged.importantEvents.push(...info.importantEvents);
-      merged.familyMembers.push(...info.familyMembers);
-      merged.friends.push(...info.friends);
-      merged.dreams.push(...info.dreams);
+      // 为每个字段添加过滤逻辑
+      // 只添加有效的兴趣爱好
+      const validInterests = info.interests.filter(item => isValidInterest(item));
+      merged.interests.push(...validInterests);
+      
+      // 只添加有效的重要事件（长度大于2，不为空）
+      const validEvents = info.importantEvents.filter(item => 
+        item && item.trim().length > 2 && item.trim() !== 'null' && item.trim() !== 'undefined'
+      );
+      merged.importantEvents.push(...validEvents);
+      
+      // 只添加有效的家庭成员（长度大于1，不为空）
+      const validFamily = info.familyMembers.filter(item => 
+        item && item.trim().length > 1 && item.trim() !== 'null' && item.trim() !== 'undefined'
+      );
+      merged.familyMembers.push(...validFamily);
+      
+      // 只添加有效的朋友（人名格式，长度大于2）
+      const validFriends = info.friends.filter(item => 
+        item && item.trim().length > 2 && 
+        !INVALID_WORDS.some(w => item.toLowerCase().includes(w)) &&
+        /^[a-zA-Z]+(?:\s+[a-zA-Z]+)?$/.test(item.trim())
+      );
+      merged.friends.push(...validFriends);
+      
+      // 只添加有效的梦想（长度大于2，不为空）
+      const validDreams = info.dreams.filter(item => 
+        item && item.trim().length > 2 && item.trim() !== 'null' && item.trim() !== 'undefined'
+      );
+      merged.dreams.push(...validDreams);
     });
     
-    // 去重
-    merged.interests = [...new Set(merged.interests)];
+    // 去重和最终清理
+    merged.interests = [...new Set(merged.interests)].map(item => cleanWord(item));
     merged.importantEvents = [...new Set(merged.importantEvents)];
     merged.familyMembers = [...new Set(merged.familyMembers)];
     merged.friends = [...new Set(merged.friends)];
