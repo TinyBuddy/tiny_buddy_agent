@@ -7,6 +7,7 @@ import { createDefaultChildProfile } from "../../models/childProfile";
 import { createMessage } from "../../models/message";
 // 不导入私有方法buildPrompt，而是在文件内部实现其逻辑
 import { getFullSystemPrompt } from "../../config/agentConfig";
+import { mem0Service } from "../../services/mem0Service";
 
 // 定义请求体参数验证模式
 export const requestBodySchema = z.object({
@@ -67,6 +68,25 @@ export async function POST(request: NextRequest) {
       }),
     ]);
     
+    // 从历史消息中提取重要记忆并写入mem0
+    try {
+      // 转换为mem0所需的chat_history格式（只取孩子的消息）
+      const chatHistoryForMem0 = historyMsgs.map(msg => msg.child);
+      
+      console.log(`处理儿童 ${childID} 的历史记忆，准备提取重要信息`);
+      
+      // 调用mem0服务更新重要记忆
+      const mem0Result = await mem0Service.updateImportantMemories({
+        child_id: childID,
+        chat_history: chatHistoryForMem0
+      });
+      
+      console.log(`mem0处理结果: ${mem0Result.success ? '成功' : '失败'} - ${mem0Result.message}`);
+    } catch (error) {
+      console.error(`更新mem0重要记忆时出错:`, error);
+      // 继续执行，不中断流程
+    }
+    
     // 获取最后一条儿童消息作为输入
     const lastChildMessage = historyMsgs.length > 0 ? historyMsgs[historyMsgs.length - 1].child : "Hello";
     
@@ -118,7 +138,7 @@ export async function POST(request: NextRequest) {
     console.log("规划结果:", parsedPlanResult);
     
     // 实现与executionAgent.buildPrompt相同逻辑的函数
-    const generatePrompt = (message: string) => {
+    const generatePrompt = async (message: string) => {
       const recentMessages = conversationHistory.slice(-5); // 获取最近5条消息
       const chatHistory = recentMessages
         .map((m) => `${m.type === "user" ? "Child" : "Sparky"}: ${m.content}`)
@@ -126,6 +146,52 @@ export async function POST(request: NextRequest) {
 
       // 从全局配置获取系统提示词
       let systemPrompt = getFullSystemPrompt(childProfile);
+      
+      // 从mem0读取重要记忆并添加到提示词中
+      try {
+        console.log(`从mem0读取儿童 ${childID} 的重要记忆`);
+        const memories = await mem0Service.search('*', {
+          user_id: childID,
+          limit: 1
+        });
+        
+        if (memories.length > 0 && memories[0].metadata && memories[0].metadata.important_info) {
+          const importantInfo = memories[0].metadata.important_info;
+          let importantMemoriesText = "\n\n# Child's Important Memories\n";
+          
+          if (importantInfo.name) {
+            importantMemoriesText += `\n- Child's name: ${importantInfo.name}`;
+          }
+          
+          if (importantInfo.familyMembers.length > 0) {
+            importantMemoriesText += `\n\n- Family members: ${importantInfo.familyMembers.join(', ')}`;
+          }
+          
+          if (importantInfo.friends.length > 0) {
+            importantMemoriesText += `\n\n- Friends: ${importantInfo.friends.join(', ')}`;
+          }
+          
+          if (importantInfo.interests.length > 0) {
+            importantMemoriesText += `\n\n- Interests: ${importantInfo.interests.join(', ')}`;
+          }
+          
+          if (importantInfo.importantEvents.length > 0) {
+            importantMemoriesText += `\n\n- Important events: ${importantInfo.importantEvents.join(', ')}`;
+          }
+          
+          if (importantInfo.dreams.length > 0) {
+            importantMemoriesText += `\n\n- Dreams: ${importantInfo.dreams.join(', ')}`;
+          }
+          
+          systemPrompt += importantMemoriesText;
+          console.log("成功添加重要记忆到提示词中");
+        } else {
+          console.log("未找到重要记忆");
+        }
+      } catch (error) {
+        console.error("读取mem0重要记忆时出错:", error);
+        // 继续执行，不中断流程
+      }
 
       // 添加相关知识库内容（如果有）
       // 注意：这里我们没有实际的知识库内容，但保持了原始逻辑
@@ -145,7 +211,7 @@ export async function POST(request: NextRequest) {
     };
     
     // 生成最终的prompt
-    const prompt = generatePrompt(lastChildMessage);
+    const prompt = await generatePrompt(lastChildMessage);
     
     // 返回成功响应
     return NextResponse.json({

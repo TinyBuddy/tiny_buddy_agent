@@ -10,6 +10,7 @@ import { InMemoryKnowledgeBaseService } from "./services/inMemoryKnowledgeBaseSe
 import { createDefaultChildProfile } from "./models/childProfile";
 import { createMessage } from "./models/message";
 import { getFullSystemPrompt } from "./config/agentConfig";
+import { mem0Service } from "./services/mem0Service";
 
 // 创建Express应用（集成Next.js功能）
 const app = express();
@@ -281,6 +282,28 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
     // 将所有历史消息格式化为更适合PlanningAgent处理的格式
     const allChildMessages = historyMsgs.map(msg => msg.child);
     
+    // 从历史消息中提取重要记忆并写入mem0
+    try {
+      // 转换为mem0所需的chat_history格式（包含孩子和助手的对话，以便更完整地提取上下文）
+      const chatHistoryForMem0 = historyMsgs.flatMap(msg => [
+        `Child: ${msg.child}`,
+        msg.AI ? `Sparky: ${msg.AI}` : ''
+      ]).filter(text => text.trim());
+      
+      console.log(`处理儿童 ${childID} 的历史记忆，准备提取重要信息`);
+      
+      // 调用mem0服务更新重要记忆
+      const mem0Result = await mem0Service.updateImportantMemories({
+        child_id: childID,
+        chat_history: chatHistoryForMem0
+      });
+      
+      console.log(`mem0处理结果: ${mem0Result.success ? '成功' : '失败'} - ${mem0Result.message}`);
+    } catch (error) {
+      console.error(`更新mem0重要记忆时出错:`, error);
+      // 继续执行，不中断流程
+    }
+    
     // 调用规划Agent的process方法生成计划，传递所有历史消息
     const planStart = Date.now();
     if (!planningAgent) {
@@ -323,17 +346,75 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
     console.log("规划结果:", parsedPlanResult);
     
     // 实现简化版的prompt生成函数
-    const generatePrompt = (message: string) => {
-      const recentMessages = conversationHistory.slice(-20); // 获取最近5条消息
+    const generatePrompt = async (message: string) => {
+      const recentMessages = conversationHistory.slice(-20); // 获取最近20条消息
       const chatHistory = recentMessages
         .map((m) => `${m.type === "user" ? "Child" : "Sparky"}: ${m.content}`)
         .join("\n");
 
       // 从全局配置获取系统提示词，确保使用正确的儿童年龄
       let systemPrompt = getFullSystemPrompt(childProfile);
+      
+      // 从mem0读取重要记忆并添加到提示词中
+      try {
+        console.log(`从mem0读取儿童 ${childID} 的重要记忆`);
+        const memories = await mem0Service.search('*', {
+          user_id: childID,
+          limit: 1 // 系统设计是每个child_id只有一条完整的综合记忆记录
+        });
+        
+        if (memories.length > 0 && memories[0].metadata && memories[0].metadata.important_info) {
+          const importantInfo = memories[0].metadata.important_info;
+          let importantMemoriesText = "\n\n# Child's Important Memories\n";
+          
+          // 完整提取所有重要记忆字段
+          if (importantInfo.name) {
+            importantMemoriesText += `\n- Child's name: ${importantInfo.name}`;
+          }
+          
+          if (importantInfo.familyMembers && importantInfo.familyMembers.length > 0) {
+            importantMemoriesText += `\n\n- Family members: ${importantInfo.familyMembers.join(', ')}`;
+          }
+          
+          if (importantInfo.friends && importantInfo.friends.length > 0) {
+            importantMemoriesText += `\n\n- Friends: ${importantInfo.friends.join(', ')}`;
+          }
+          
+          if (importantInfo.interests && importantInfo.interests.length > 0) {
+            importantMemoriesText += `\n\n- Interests: ${importantInfo.interests.join(', ')}`;
+          }
+          
+          if (importantInfo.importantEvents && importantInfo.importantEvents.length > 0) {
+            importantMemoriesText += `\n\n- Important events: ${importantInfo.importantEvents.join(', ')}`;
+          }
+          
+          if (importantInfo.dreams && importantInfo.dreams.length > 0) {
+            importantMemoriesText += `\n\n- Dreams: ${importantInfo.dreams.join(', ')}`;
+          }
+          
+          // 额外添加完整的记忆内容，确保不丢失任何信息
+          if (memories[0].content) {
+            importantMemoriesText += `\n\n## Complete Memory Content:\n${memories[0].content}`;
+          }
+          
+          systemPrompt += importantMemoriesText;
+          console.log("成功添加重要记忆到提示词中");
+        } else {
+          console.log("未找到重要记忆");
+        }
+      } catch (error) {
+        console.error("读取mem0重要记忆时出错:", error);
+        // 继续执行，不中断流程
+      }
 
       // 添加教学策略
       systemPrompt += `\n\nTeaching strategy for this interaction: ${parsedPlanResult.strategy}\n`;
+
+      // 添加计划信息（如果有）
+      if (parsedPlanResult?.teachingFocus) {
+        console.log("prompt add plan:", parsedPlanResult);
+        systemPrompt += `\n\nTeaching focus for this interaction: ${parsedPlanResult.teachingFocus}\n`;
+      }
 
       // 构建完整的prompt
       const prompt = `
@@ -351,7 +432,7 @@ console.log(`[DEBUG] 生成的prompt: ${prompt}`);
     
     // 生成最终的prompt
     const promptStart = Date.now();
-    const prompt = generatePrompt(lastChildMessage);
+    const prompt = await generatePrompt(lastChildMessage);
     console.log(`[API_PERF] 生成prompt耗时: ${Date.now() - promptStart}ms`);
     
     // 存入缓存

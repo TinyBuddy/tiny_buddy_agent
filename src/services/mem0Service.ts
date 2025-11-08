@@ -1,4 +1,25 @@
 import MemoryClient from 'mem0ai';
+import OpenAI from 'openai';
+
+// OpenAI客户端配置
+let openaiClient: OpenAI | null = null;
+
+// 获取OpenAI客户端实例的函数
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    
+    // 验证必要的配置
+    if (!OPENAI_API_KEY) {
+      console.error('警告: 未配置OpenAI API密钥，请检查OPENAI_API_KEY环境变量');
+    }
+    
+    openaiClient = new OpenAI({
+      apiKey: OPENAI_API_KEY || ''
+    });
+  }
+  return openaiClient;
+}
 
 // mem0 API配置 - 在类内部动态获取
 let mem0Client: MemoryClient | null = null;
@@ -32,6 +53,7 @@ export interface UpdateImportantMemoriesRequest {
 
 // 重要记忆信息接口
 export interface ImportantInfo {
+  name?: string;            // 孩子的名字
   interests: string[];      // 兴趣爱好
   importantEvents: string[]; // 重要事件
   familyMembers: string[];   // 家庭成员
@@ -62,6 +84,74 @@ const INTEREST_PATTERNS = [
   /favorite(?:s)?(?:\s+thing)?:?\s*([^,.;!\n]+)/gi,
   /enjoy(?:s)?\s+([^,.;!\n]+)/gi,
   /I enjoy(?:s)?\s+(.+?)(?:\s+and\s+|\s*$)/gi,  // "I enjoy reading books"
+];
+
+// 兴趣类别提取正则表达式
+const CATEGORY_SPECIFIC_PATTERNS = {
+  animals: [
+    /I like(?:s)?\s+(dogs|cats|birds|fish|tigers|lions|elephants|monkeys|dolphins|penguins|pandas|zebras|giraffes|horses|cows|sheep|rabbits|foxes|bears|koalas)/gi,
+    /favorite\s+animal(?:s)?:?\s*([^,.;!\n]+)/gi,
+    /like(?:s)?\s+(?:pet|animal)s?:?\s*([^,.;!\n]+)/gi,
+    /love\s+(?:pet|animal)s?:?\s*([^,.;!\n]+)/gi,
+    /interested in\s+(?:pet|animal)s?:?\s*([^,.;!\n]+)/gi,
+  ],
+  sports: [
+    /I like(?:s)?\s+(soccer|football|basketball|baseball|tennis|swimming|running|cycling|dancing|gymnastics)/gi,
+    /favorite\s+sport(?:s)?:?\s*([^,.;!\n]+)/gi,
+    /like(?:s)?\s+playing\s+([^,.;!\n]+)/gi,
+    /love\s+playing\s+([^,.;!\n]+)/gi,
+    /enjoy\s+playing\s+([^,.;!\n]+)/gi,
+  ],
+  games: [
+    /I like(?:s)?\s+(video games|board games|card games|puzzles|hide and seek|tag|chess|checkers)/gi,
+    /favorite\s+game(?:s)?:?\s*([^,.;!\n]+)/gi,
+    /like(?:s)?\s+playing\s+(?:video|computer)\s*games?:?\s*([^,.;!\n]+)?/gi,
+    /love\s+playing\s+(?:video|computer)\s*games?:?\s*([^,.;!\n]+)?/gi,
+  ],
+  activities: [
+    /I like(?:s)?\s+(drawing|painting|singing|dancing|reading|writing|cooking|crafts|hiking|camping)/gi,
+    /favorite\s+activity(?:ies)?:?\s*([^,.;!\n]+)/gi,
+    /like(?:s)?\s+to\s+([^,.;!\n]+)/gi,
+    /enjoy\s+([^,.;!\n]+)/gi,
+  ],
+  foods: [
+    /I like(?:s)?\s+(pizza|ice cream|chocolate|cake|fruits|vegetables|cookies|burgers|pasta)/gi,
+    /favorite\s+food(?:s)?:?\s*([^,.;!\n]+)/gi,
+    /like(?:s)?\s+to\s+eat\s+([^,.;!\n]+)/gi,
+    /love\s+([^,.;!\n]+)/gi,
+  ]
+};
+
+// 常见兴趣词汇列表
+const COMMON_INTERESTS = {
+  animals: [
+    'dog', 'cat', 'bird', 'fish', 'tiger', 'lion', 'elephant', 'monkey', 'dolphin', 'penguin',
+    'panda', 'zebra', 'giraffe', 'horse', 'cow', 'sheep', 'rabbit', 'fox', 'bear', 'koala',
+    'doggy', 'puppy', 'kitten', 'kitty', 'bunny', 'puppies', 'kittens', 'dogs', 'cats', 'birds', 'dinosaur'
+  ],
+  sports: [
+    'soccer', 'football', 'basketball', 'baseball', 'tennis', 'swimming', 'running', 'cycling', 
+    'dancing', 'gymnastics', 'volleyball', 'hockey', 'golf', 'martial arts', 'yoga', 'karate',
+    'basketball', 'baseballs', 'footballs', 'soccer balls'
+  ],
+  games: [
+    'video game', 'board game', 'card game', 'puzzle', 'hide and seek', 'tag', 'chess', 'checkers',
+    'minecraft', 'roblox', 'legos', 'lego', 'blocks', 'puzzles', 'board games', 'video games'
+  ],
+  activities: [
+    'drawing', 'painting', 'singing', 'dancing', 'reading', 'writing', 'cooking', 'crafts', 
+    'hiking', 'camping', 'swimming', 'biking', 'skating', 'skiing', 'drawing pictures', 'coloring'
+  ],
+  foods: [
+    'pizza', 'ice cream', 'chocolate', 'cake', 'fruit', 'vegetable', 'cookie', 'burger', 'pasta',
+    'apples', 'bananas', 'oranges', 'strawberries', 'chicken', 'rice', 'noodles', 'soup'
+  ]
+};
+
+// 需要跳过的通用类别
+const GENERIC_CATEGORIES = [
+  'animals', 'animal', 'sports', 'sport', 'games', 'game', 
+  'activities', 'activity', 'foods', 'food'
 ];
 
 const IMPORTANT_EVENT_PATTERNS = [
@@ -103,20 +193,23 @@ const DREAM_PATTERNS = [
   /ambition:?\s*([^,.;!\n]+)/gi,
 ];
 
+// 名字提取正则表达式模式
+const NAME_PATTERNS = [
+  /My name is\s+([^,.;!\n]+)/gi,
+  /I am\s+([^,.;!\n]+)/gi,
+  /I'm\s+([^,.;!\n]+)/gi,
+  /call me\s+([^,.;!\n]+)/gi,
+  /my name's\s+([^,.;!\n]+)/gi,
+  /name:?\s*([^,.;!\n]+)/gi,
+];
+
 // 第三方系统接口请求定义
 export interface UpdateImportantMemoriesRequest {
   child_id: string;
   chat_history: string[]; // 历史对话记录数组
 }
 
-// 重要记忆信息接口
-export interface ImportantInfo {
-  interests: string[];      // 兴趣爱好
-  importantEvents: string[]; // 重要事件
-  familyMembers: string[];   // 家庭成员
-  friends: string[];         // 朋友伙伴
-  dreams: string[];          // 理想梦想
-}
+// 重要记忆信息接口已在文件顶部定义
 
 // 记忆存储接口
 export interface ImportantMemory {
@@ -131,30 +224,238 @@ export interface ImportantMemory {
 }
 
 // 提取文本中的关键信息
-function extractImportantInfo(texts: string[]): ImportantInfo {
+// 无效词汇列表 - 需要排除的单个字符、标点和无意义词汇
+const INVALID_WORDS = [
+  '?', '!', '.', ',', ';', ':', '-', '_', '+', '=', '*', '/', '\\',
+  'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+  'with', 'by', 'from', 'of', 'is', 'are', 'was', 'were', 'be', 'been',
+  'do', 'does', 'did', 'have', 'has', 'had', 'will', 'would', 'could',
+  'should', 'may', 'might', 'must', 'shall', 'can', 'all', 'most', 'my',
+  'your', 'his', 'her', 'its', 'our', 'their', 'this', 'that', 'these',
+  'those', 'there', 'here', 'Oh', 'Sparky:', 'too', 'too?', 'yummy', 'fun', 
+  'things', 'making', 'happy', 'sounds', 'hear', 'fun', 'song', 'rain', 'about'
+];
+
+// 过滤掉emoji的正则表达式
+const EMOJI_REGEX = /[\u{1F300}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}]/gu;
+
+// 检查词汇是否有效
+function isValidInterest(word: string): boolean {
+  // 移除emoji
+  word = word.replace(EMOJI_REGEX, '').trim();
+  
+  // 排除空字符串、单个字符、无效词汇和标点符号
+  if (!word || word.length <= 1 || INVALID_WORDS.includes(word.toLowerCase()) || /^[?.,!;:]$/.test(word)) {
+    return false;
+  }
+  // 排除纯数字
+  if (/^\d+$/.test(word)) {
+    return false;
+  }
+  // 排除包含特殊字符的词汇
+  if (/[?.,!;:]$/.test(word)) {
+    return false;
+  }
+  return true;
+}
+
+// 清理词汇 - 移除末尾标点符号、emoji等
+function cleanWord(word: string): string {
+  return word.replace(EMOJI_REGEX, '').replace(/[?.,!;:]$/, '').trim();
+}
+
+// 使用OpenAI API提取重要信息的异步函数
+async function extractImportantInfoWithAI(texts: string[]): Promise<ImportantInfo> {
+  try {
+    const combinedText = texts.join('\n');
+    
+    const completion = await getOpenAIClient().chat.completions.create({
+      model: 'gpt-4.1',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a precise information extraction assistant specialized in extracting detailed information about children from conversation records. Please extract the following information with specific details:
+          
+          1. name: The child's full name
+          2. interests: Specific hobbies and interests with details (e.g., "playing basketball", "reading books", "painting") - extract exact activities, not general categories
+          3. importantEvents: Important events with specific details (e.g., "Birthday on June 15, 2015", "Won the school spelling bee") - include dates when mentioned
+          4. familyMembers: Family members with relationships (e.g., "mom Sarah", "brother Tom")
+          5. friends: Friends with actual names (e.g., "Tom", "Emma") - extract only real names
+          6. dreams: Specific dreams and aspirations (e.g., "want to be a doctor", "want to travel to Mars")
+          
+          IMPORTANT INSTRUCTIONS:
+          - Extract SPECIFIC details, not general terms
+          - For birthdays, include the exact date (year, month, day) if mentioned
+          - For interests, include the specific activity (e.g., "playing basketball" instead of just "sports")
+          - Ensure each item is a discrete, meaningful piece of information
+          - Include proper nouns, specific dates, and concrete activities
+          - Exclude emojis, articles, and meaningless words
+          
+          Return ONLY a valid JSON object with the six fields. Do not include any explanations or additional text outside the JSON.`
+        },
+        {
+          role: 'user',
+          content: `Extract detailed information about the child from the following conversation:\n${combinedText}`
+        }
+      ],
+      response_format: { type: 'json_object' }
+    });
+    
+    // 解析AI返回的JSON
+    const aiResult = JSON.parse(completion.choices[0].message.content || '{}');
+    
+    // 确保返回的数据符合ImportantInfo接口
+    // 优化过滤逻辑，避免过滤掉有效信息
+    return {
+      name: aiResult.name?.trim() || undefined,
+      interests: aiResult.interests?.filter((item: string) => {
+        if (!item || typeof item !== 'string' || item.trim().length < 2) return false;
+        // 允许更详细的兴趣描述，如"playing basketball"
+        const cleanedItem = item.trim().toLowerCase();
+        // 移除emoji
+        const withoutEmoji = cleanedItem.replace(EMOJI_REGEX, '').trim();
+        // 检查是否只包含无效词
+        const words = withoutEmoji.split(/\s+/);
+        return words.some(word => !INVALID_WORDS.includes(word.toLowerCase()));
+      }) || [],
+      importantEvents: aiResult.importantEvents?.filter((item: string) => {
+        if (!item || typeof item !== 'string') return false;
+        const cleanedItem = item.trim();
+        // 允许更短但有意义的事件描述，特别是包含日期的
+        return cleanedItem.length > 2 || /\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4}/.test(cleanedItem);
+      }) || [],
+      familyMembers: aiResult.familyMembers?.filter((item: string) => {
+        if (!item || typeof item !== 'string') return false;
+        return item.trim().length > 1;
+      }) || [],
+      friends: aiResult.friends?.filter((item: string) => {
+        if (!item || typeof item !== 'string') return false;
+        const cleanedItem = item.trim();
+        return cleanedItem.length > 1 && !INVALID_WORDS.includes(cleanedItem.toLowerCase());
+      }) || [],
+      dreams: aiResult.dreams?.filter((item: string) => {
+        if (!item || typeof item !== 'string') return false;
+        return item.trim().length > 2;
+      }) || []
+    };
+  } catch (error) {
+    console.error('OpenAI API调用失败，将回退到正则表达式提取:', error);
+    // 回退到传统的正则表达式提取方法
+    return extractImportantInfoWithRegex(texts);
+  }
+}
+
+// 使用正则表达式提取重要信息的备用函数
+function extractImportantInfoWithRegex(texts: string[]): ImportantInfo {
   const combinedText = texts.join('\n');
+  let name: string | undefined;
   const interests: string[] = [];
   const importantEvents: string[] = [];
   const familyMembers: string[] = [];
   const friends: string[] = [];
   const dreams: string[] = [];
   
+  // 提取名字
+  NAME_PATTERNS.forEach(pattern => {
+    let match;
+    while ((match = pattern.exec(combinedText)) !== null) {
+      if (match[1]) {
+        // 只取第一个匹配的名字
+        name = match[1].trim();
+        return;
+      }
+    }
+  });
+  
   // 提取兴趣爱好
   INTEREST_PATTERNS.forEach(pattern => {
     let match;
     while ((match = pattern.exec(combinedText)) !== null) {
       if (match[1]) {
-        interests.push(match[1].trim());
+        const interestText = match[1].trim();
+        // 如果兴趣文本是通用类别，跳过，稍后通过专门的模式提取具体内容
+        if (GENERIC_CATEGORIES.includes(interestText.toLowerCase())) {
+          continue;
+        }
+        // 只添加有效的兴趣
+        if (isValidInterest(interestText)) {
+          interests.push(interestText);
+        }
       }
     }
   });
+  
+  // 专门提取各类别的具体内容
+  const lowerText = combinedText.toLowerCase();
+  
+  // 处理每个兴趣类别
+  Object.entries(CATEGORY_SPECIFIC_PATTERNS).forEach(([category, patterns]) => {
+    patterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(combinedText)) !== null) {
+        if (match[1]) {
+          const text = match[1].trim();
+          // 分割可能包含多个项目的文本
+          const parts = text.split(/[,;\s]+/);
+          parts.forEach(part => {
+            const cleanedPart = cleanWord(part.trim());
+            if (cleanedPart && !GENERIC_CATEGORIES.includes(cleanedPart.toLowerCase()) && 
+                isValidInterest(cleanedPart)) {
+              interests.push(cleanedPart);
+            }
+          });
+        }
+      }
+    });
+  });
+  
+  // 额外检查：从文本中提取常见兴趣词汇
+  const allCommonInterests = Object.values(COMMON_INTERESTS).flat();
+  allCommonInterests.forEach(interest => {
+    // 使用边界匹配确保我们找到的是完整的兴趣单词
+    const regex = new RegExp(`\\b${interest}\\b`, 'i');
+    if (regex.test(lowerText)) {
+      // 转换为单数形式（简单处理）
+      let singularInterest = interest;
+      if (interest.endsWith('ies')) {
+        singularInterest = interest.slice(0, -3) + 'y'; // 将kitties转换为kitty
+      } else if (interest.endsWith('s') && !['fish', 'sheep', 'sports'].includes(interest)) {
+        singularInterest = interest.slice(0, -1); // 将dogs转换为dog
+      }
+      // 只添加有效的兴趣
+      if (isValidInterest(singularInterest)) {
+        interests.push(singularInterest);
+      }
+    }
+  });
+  
+  // 特殊处理：提取"I like ..."模式中的具体兴趣
+  const likePattern = /I like(?:s)?\s+([^,.;!\n]+)/gi;
+  let likeMatch;
+  while ((likeMatch = likePattern.exec(combinedText)) !== null) {
+    if (likeMatch[1]) {
+      const likes = likeMatch[1].trim();
+      // 处理"I like A and B"或"I like A, B"格式
+      const items = likes.split(/\s+and\s+|[,;\s]+/);
+      items.forEach(item => {
+        const cleanedItem = cleanWord(item.trim());
+        if (cleanedItem && !GENERIC_CATEGORIES.includes(cleanedItem.toLowerCase()) && 
+            isValidInterest(cleanedItem)) {
+          interests.push(cleanedItem);
+        }
+      });
+    }
+  };
   
   // 提取重要事件
   IMPORTANT_EVENT_PATTERNS.forEach(pattern => {
     let match;
     while ((match = pattern.exec(combinedText)) !== null) {
       if (match[1]) {
-        importantEvents.push(match[1].trim());
+        const eventText = match[1].trim();
+        if (eventText && eventText.length > 2) {
+          importantEvents.push(eventText);
+        }
       }
     }
   });
@@ -164,17 +465,26 @@ function extractImportantInfo(texts: string[]): ImportantInfo {
     let match;
     while ((match = pattern.exec(combinedText)) !== null) {
       if (match[1]) {
-        familyMembers.push(match[1].trim());
+        const familyText = match[1].trim();
+        if (familyText && familyText.length > 1) {
+          familyMembers.push(familyText);
+        }
       }
     }
   });
   
-  // 提取朋友伙伴
+  // 提取朋友伙伴 - 更严格的过滤，只接受人名
   FRIEND_PATTERNS.forEach(pattern => {
     let match;
     while ((match = pattern.exec(combinedText)) !== null) {
       if (match[1]) {
-        friends.push(match[1].trim());
+        const friendText = match[1].trim();
+        // 更严格的过滤：排除短语和描述，只接受可能的人名
+        if (friendText && friendText.length > 2 && 
+            !INVALID_WORDS.some(invalid => friendText.toLowerCase().includes(invalid)) &&
+            /^[a-zA-Z]+(?:\s+[a-zA-Z]+)?$/.test(friendText)) {
+          friends.push(friendText);
+        }
       }
     }
   });
@@ -184,12 +494,16 @@ function extractImportantInfo(texts: string[]): ImportantInfo {
     let match;
     while ((match = pattern.exec(combinedText)) !== null) {
       if (match[1]) {
-        dreams.push(match[1].trim());
+        const dreamText = match[1].trim();
+        if (dreamText && dreamText.length > 2) {
+          dreams.push(dreamText);
+        }
       }
     }
   });
   
   return {
+    name,
     interests: [...new Set(interests)], // 去重
     importantEvents: [...new Set(importantEvents)],
     familyMembers: [...new Set(familyMembers)],
@@ -198,9 +512,16 @@ function extractImportantInfo(texts: string[]): ImportantInfo {
   };
 }
 
+// 主提取函数 - 默认使用AI提取
+async function extractImportantInfo(texts: string[]): Promise<ImportantInfo> {
+  // 首先尝试使用AI提取
+  return await extractImportantInfoWithAI(texts);
+}
+
 // 检查是否包含重要信息
 function hasImportantInfo(info: ImportantInfo): boolean {
-  return info.interests.length > 0 || 
+  return !!info.name || 
+         info.interests.length > 0 || 
          info.importantEvents.length > 0 || 
          info.familyMembers.length > 0 || 
          info.friends.length > 0 || 
@@ -349,24 +670,37 @@ export class Mem0Service {
     }
   }
   
-  // 更新特定记忆（内部方法，保持向后兼容）
-  private async updateMemory(memoryId: string, data: {
-    content: string;
-    metadata: any;
-    tags?: string[];
-  }): Promise<any> {
+  // 获取特定孩子的所有重要记忆 - 公共方法
+  async getImportantMemoriesByChildId(child_id: string): Promise<ImportantMemory[]> {
     try {
-      // 使用新的update方法
-      return await this.update(memoryId, {
+      console.log(`获取child_id: ${child_id} 的所有重要记忆`);
+      
+      // 使用search方法搜索特定child_id的所有记忆
+      const memories = await this.search('*', {
+        user_id: child_id,
+        limit: 100,
         metadata: {
-          ...data.metadata,
-          content: data.content,
-          updated_at: new Date().toISOString()
+          agent_id: AGENT_ID,
+          child_id: child_id
         }
       });
+      
+      console.log(`总共搜索到 ${memories.length} 个记忆项`);
+      
+      // 转换并过滤记忆，只返回包含important_info的记忆
+      const importantMemories = memories.map((item: any) => ({
+        id: item.id,
+        content: item.memory || item.text || item.content || '',
+        metadata: item.metadata || {}
+      })).filter((mem: ImportantMemory) => 
+        mem.metadata && mem.metadata.important_info
+      );
+      
+      console.log(`其中包含重要记忆的有 ${importantMemories.length} 个`);
+      return importantMemories;
     } catch (error) {
-      console.error(`更新记忆失败 (ID: ${memoryId}):`, error);
-      throw error;
+      console.error(`获取孩子重要记忆失败 (child_id: ${child_id}):`, error);
+      return [];
     }
   }
 
@@ -391,8 +725,11 @@ export class Mem0Service {
     try {
       const { child_id, chat_history } = req;
       
-      // 1. 提取新的重要信息
-      const newImportantInfo = extractImportantInfo(chat_history);
+      console.log(`开始更新孩子 ${child_id} 的重要记忆`);
+      
+      // 1. 提取新的重要信息 - 使用异步方法
+      const newImportantInfo = await extractImportantInfo(chat_history);
+      console.log('提取到的重要信息:', JSON.stringify(newImportantInfo));
       
       // 如果没有提取到重要信息，尝试返回历史重要信息
       if (!hasImportantInfo(newImportantInfo)) {
@@ -457,15 +794,14 @@ export class Mem0Service {
         const metadata = {
           ...existingMemories[0].metadata,
           important_info: finalImportantInfo,
-          updated_at: timestamp
+          created_at: existingMemories[0].metadata?.created_at || timestamp,
+          updated_at: timestamp,
+          child_id: child_id
         };
         
         // 使用新的update接口更新记忆
         const updatedMemory = await this.update(existingMemories[0].id, {
-          metadata: {
-            ...metadata,
-            content: memoryContent
-          }
+          metadata: metadata
         });
         
         // 删除其他可能存在的旧记忆（如果有多个）
@@ -490,10 +826,11 @@ export class Mem0Service {
       
       const timestamp = new Date().toISOString();
       const metadata = {
-        child_id,
+        child_id: child_id,
         important_info: finalImportantInfo,
         created_at: timestamp,
-        updated_at: timestamp
+        updated_at: timestamp,
+        agent_id: AGENT_ID
       };
       
       // 使用新的add方法创建记忆
@@ -501,13 +838,10 @@ export class Mem0Service {
         { role: 'user' as const, content: memoryContent }
       ];
       
-      console.log('创建新记忆数据:', { child_id, memoryContent_length: memoryContent.length });
+      console.log('创建新记忆数据:', { child_id, memoryContent_length: memoryContent.length, hasImportantInfo: hasImportantInfo(finalImportantInfo) });
       const addResult = await this.add(messages, {
         user_id: child_id,
-        metadata: {
-          ...metadata,
-          content: memoryContent
-        }
+        metadata: metadata
       });
       
       const memoryId = addResult[0]?.id;
@@ -569,42 +903,10 @@ export class Mem0Service {
     }
   }
   
-  // 搜索特定孩子的重要记忆（内部方法，保持向后兼容）
-  private async searchImportantMemories(child_id: string): Promise<ImportantMemory[]> {
-    try {
-      // 使用新的search方法
-      const memories = await this.search('*', {
-        user_id: child_id,
-        limit: 10
-      });
-      
-      return memories.map((item: any) => ({
-        id: item.id,
-        content: item.memory || item.text || item.content || '',
-        metadata: item.metadata || {}
-      })).filter((mem: ImportantMemory) => 
-        mem.metadata && mem.metadata.important_info
-      );
-    } catch (error) {
-      console.error('搜索重要记忆失败:', error);
-      return [];
-    }
-  }
-  
-  // 删除特定记忆
-  private async deleteMemory(memoryId: string): Promise<void> {
-    try {
-      // 使用官方SDK的delete方法
-      await this.delete(memoryId);
-    } catch (error) {
-      console.error(`删除记忆失败 (ID: ${memoryId}):`, error);
-      // 忽略删除错误，继续执行
-    }
-  }
-  
   // 合并多个重要信息对象
   private mergeImportantInfo(infoList: ImportantInfo[]): ImportantInfo {
     const merged: ImportantInfo = {
+      name: undefined,
       interests: [],
       importantEvents: [],
       familyMembers: [],
@@ -612,16 +914,49 @@ export class Mem0Service {
       dreams: []
     };
     
+    // 首先找到第一个非空的name
+    for (const info of infoList) {
+      if (info.name && info.name.trim()) {
+        merged.name = info.name.trim();
+        break;
+      }
+    }
+    
     infoList.forEach(info => {
-      merged.interests.push(...info.interests);
-      merged.importantEvents.push(...info.importantEvents);
-      merged.familyMembers.push(...info.familyMembers);
-      merged.friends.push(...info.friends);
-      merged.dreams.push(...info.dreams);
+      // 为每个字段添加过滤逻辑
+      // 只添加有效的兴趣爱好
+      const validInterests = info.interests.filter(item => isValidInterest(item));
+      merged.interests.push(...validInterests);
+      
+      // 只添加有效的重要事件（长度大于2，不为空）
+      const validEvents = info.importantEvents.filter(item => 
+        item && item.trim().length > 2 && item.trim() !== 'null' && item.trim() !== 'undefined'
+      );
+      merged.importantEvents.push(...validEvents);
+      
+      // 只添加有效的家庭成员（长度大于1，不为空）
+      const validFamily = info.familyMembers.filter(item => 
+        item && item.trim().length > 1 && item.trim() !== 'null' && item.trim() !== 'undefined'
+      );
+      merged.familyMembers.push(...validFamily);
+      
+      // 只添加有效的朋友（人名格式，长度大于2）
+      const validFriends = info.friends.filter(item => 
+        item && item.trim().length > 2 && 
+        !INVALID_WORDS.some(w => item.toLowerCase().includes(w)) &&
+        /^[a-zA-Z]+(?:\s+[a-zA-Z]+)?$/.test(item.trim())
+      );
+      merged.friends.push(...validFriends);
+      
+      // 只添加有效的梦想（长度大于2，不为空）
+      const validDreams = info.dreams.filter(item => 
+        item && item.trim().length > 2 && item.trim() !== 'null' && item.trim() !== 'undefined'
+      );
+      merged.dreams.push(...validDreams);
     });
     
-    // 去重
-    merged.interests = [...new Set(merged.interests)];
+    // 去重和最终清理
+    merged.interests = [...new Set(merged.interests)].map(item => cleanWord(item));
     merged.importantEvents = [...new Set(merged.importantEvents)];
     merged.familyMembers = [...new Set(merged.familyMembers)];
     merged.friends = [...new Set(merged.friends)];
@@ -633,6 +968,10 @@ export class Mem0Service {
   // 生成记忆内容文本 - English version
   private generateMemoryContent(info: ImportantInfo): string {
     let content = `Child Important Information Summary:\n\n`;
+    
+    if (info.name) {
+      content += `Name: ${info.name}\n\n`;
+    }
     
     if (info.interests.length > 0) {
       content += `Interests:\n${info.interests.map(item => `- ${item}`).join('\n')}\n\n`;
