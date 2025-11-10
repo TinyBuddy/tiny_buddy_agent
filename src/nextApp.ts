@@ -324,7 +324,7 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
     
     // 实现简化版的prompt生成函数
     const generatePrompt = (message: string) => {
-      const recentMessages = conversationHistory.slice(-20); // 获取最近5条消息
+      const recentMessages = conversationHistory.slice(-20); // 获取最近20条消息
       const chatHistory = recentMessages
         .map((m) => `${m.type === "user" ? "Child" : "Sparky"}: ${m.content}`)
         .join("\n");
@@ -334,11 +334,30 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
 
       // 添加教学策略
       systemPrompt += `\n\nTeaching strategy for this interaction: ${parsedPlanResult.strategy}\n`;
+      
+      // 构建包含function call的提示词部分
+      const functionCallInstruction = `
+
+# Tool Call Instructions
+When you need to play nursery rhymes or tell stories, please use the following tool call format to get relevant content:\n\`\`\`json
+{
+  "name": "fetch_knowledge_from_api",
+  "parameters": {
+    "query": "keywords for the nursery rhyme or story you want to search"
+  }
+}
+\`\`\`
+
+Applicable scenarios:
+- When the child requests nursery rhymes, music, or wants to hear a story
+- When the interaction plan suggests using songs or stories
+- When songs or stories can enhance learning outcomes
+`;
 
       // 构建完整的prompt
       const prompt = `
 ${systemPrompt}
-
+${functionCallInstruction}
 
 # history conversations
 
@@ -359,14 +378,36 @@ console.log(`[DEBUG] 生成的prompt: ${prompt}`);
       promptCache.set(cacheKey, prompt);
     }
     
-    // 返回标准的JSON响应格式
+    // 返回标准的JSON响应格式，包含function call定义
     const responseStart = Date.now();
+    
+    // 定义function call结构，供客户端使用，包含API端点和密钥信息
+    const functions = [
+      {
+        name: 'fetch_knowledge_from_api',
+        description: 'Fetch relevant nursery rhymes and stories from the knowledge base based on query content',
+        apiEndpoint: 'http://136.115.118.154/api/v1/knowledge-chat/d15b185a-a786-4039-b15b-1d6fb4a8d4e3',
+        apiKey: 'sk-AFVxhsKKYpfMSSIho5hyqskh8Rbd96ZbVytFRy3pan09Vn1g',
+        parameters: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'Query content used to search for relevant nursery rhymes and stories',
+            },
+          },
+          required: ['query'],
+        },
+      },
+    ];
+    
     res.json({
       success: true,
       code: 0,
       msg: "提示生成成功",
       data: {
         prompt,
+        functions, // 添加functions字段，包含function call定义
         childID,
         fromCache: false
       },
