@@ -10,6 +10,7 @@ import { InMemoryKnowledgeBaseService } from "./services/inMemoryKnowledgeBaseSe
 import { createDefaultChildProfile } from "./models/childProfile";
 import { createMessage } from "./models/message";
 import { getFullSystemPrompt } from "./config/agentConfig";
+import { mem0Service } from "./services/mem0Service";
 
 // 创建Express应用（集成Next.js功能）
 const app = express();
@@ -226,12 +227,33 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
     if (promptCache.has(cacheKey)) {
       const cachedResult = promptCache.get(cacheKey);
       console.log(`[API_PERF] 缓存命中，跳过处理，总耗时: ${Date.now() - startTime}ms`);
+      // 定义function call结构，供客户端使用，包含API端点和密钥信息
+      const functions = [
+        {
+          name: 'fetch_knowledge_from_api',
+          description: 'Fetch relevant nursery rhymes and stories from the knowledge base based on query content',
+          apiEndpoint: 'http://136.115.118.154/api/v1/knowledge-chat/d15b185a-a786-4039-b15b-1d6fb4a8d4e3',
+          apiKey: 'sk-AFVxhsKKYpfMSSIho5hyqskh8Rbd96ZbVytFRy3pan09Vn1g',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'Query content used to search for relevant nursery rhymes and stories',
+              },
+            },
+            required: ['query'],
+          },
+        },
+      ];
+
       return res.json({
         success: true,
         code: 0,
         msg: "提示生成成功(来自缓存)",
         data: {
           prompt: cachedResult,
+          functions,
           childID,
           fromCache: true
         },
@@ -281,6 +303,41 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
     // 将所有历史消息格式化为更适合PlanningAgent处理的格式
     const allChildMessages = historyMsgs.map(msg => msg.child);
     
+    // 从历史消息中提取重要记忆并写入mem0 - 使用三维记忆分类模型
+    try {
+      // 转换为mem0所需的chat_history格式（包含孩子和助手的对话，以便更完整地提取上下文）
+      const chatHistoryForMem0 = historyMsgs.flatMap(msg => [
+        `Child: ${msg.child}`,
+        msg.AI ? `Sparky: ${msg.AI}` : ''
+      ]).filter(text => text.trim());
+      
+      console.log(`处理儿童 ${childID} 的历史记忆，准备提取重要信息`);
+      
+      // 调用mem0服务更新重要记忆，使用三维记忆分类模型
+      const mem0Result = await mem0Service.updateImportantMemories({
+        child_id: childID,
+        chat_history: chatHistoryForMem0,
+        // 添加记忆分类策略参数，使用认知心理学模型（事实、感知、指令）
+        memoryClassificationStrategy: 'cognitive_psychology'
+      });
+      
+      console.log(`mem0处理结果: ${mem0Result.success ? '成功' : '失败'} - ${mem0Result.message}`);
+      
+      // 额外获取按类型分类的记忆，以验证三维分类效果
+      try {
+        const factualMemories = await mem0Service.getChildMemoryByType(childID, 'facts');
+        const perceptionMemories = await mem0Service.getChildMemoryByType(childID, 'perceptions');
+        const instructionMemories = await mem0Service.getChildMemoryByType(childID, 'instructions');
+        
+        console.log(`三维分类记忆统计 - 事实记忆: ${factualMemories.length}, 感知记忆: ${perceptionMemories.length}, 指令记忆: ${instructionMemories.length}`);
+      } catch (typeError) {
+        console.warn(`获取分类记忆统计时出错:`, typeError);
+      }
+    } catch (error) {
+      console.error(`更新mem0重要记忆时出错:`, error);
+      // 继续执行，不中断流程
+    }
+    
     // 调用规划Agent的process方法生成计划，传递所有历史消息
     const planStart = Date.now();
     if (!planningAgent) {
@@ -323,7 +380,7 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
     console.log("规划结果:", parsedPlanResult);
     
     // 实现简化版的prompt生成函数
-    const generatePrompt = (message: string) => {
+    const generatePrompt = async (message: string) => {
       const recentMessages = conversationHistory.slice(-20); // 获取最近20条消息
       const chatHistory = recentMessages
         .map((m) => `${m.type === "user" ? "Child" : "Sparky"}: ${m.content}`)
@@ -331,9 +388,186 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
 
       // 从全局配置获取系统提示词，确保使用正确的儿童年龄
       let systemPrompt = getFullSystemPrompt(childProfile);
+      
+      // 从mem0读取重要记忆并添加到提示词中 - 基于三维记忆分类模型优化
+      try {
+        console.log(`从mem0读取儿童 ${childID} 的重要记忆`);
+        
+        // 使用增强的语义搜索方法获取相关记忆
+        // 基于当前输入和历史消息，智能判断需要哪些类型的记忆
+        const lastChildMessage = historyMsgs.length > 0 ? historyMsgs[historyMsgs.length - 1].child : "Hello";
+        
+        // 获取当前查询类型 - 本地实现分析逻辑，与mem0Service保持一致
+         const analyzeQueryType = (query: string): 'factual' | 'experiential' | 'instructional' | 'mixed' => {
+           const lowerQuery = query.toLowerCase();
+           
+           // 事实性查询模式
+           const factualPatterns = /what|when|where|who|which|how many|how much|facts|information|details/;
+           // 体验性查询模式
+           const experientialPatterns = /like|love|enjoy|feel|experience|remember|favorite|hate|dislike|happy|sad/;
+           // 指令性查询模式
+           const instructionalPatterns = /should|must|need to|how to|remember to|don't|shouldn't|avoid|tips|guide/;
+           
+           const isFactual = factualPatterns.test(lowerQuery);
+           const isExperiential = experientialPatterns.test(lowerQuery);
+           const isInstructional = instructionalPatterns.test(lowerQuery);
+           
+           // 统计匹配的类型数量
+           const matchCount = [isFactual, isExperiential, isInstructional].filter(Boolean).length;
+           
+           // 如果只匹配一种类型，返回该类型
+           if (matchCount === 1) {
+             if (isFactual) return 'factual';
+             if (isExperiential) return 'experiential';
+             if (isInstructional) return 'instructional';
+           }
+           
+           // 多种类型匹配，返回混合类型
+           return 'mixed';
+         };
+         
+         const queryType = analyzeQueryType(lastChildMessage);
+          
+        console.log(`查询类型分析结果: ${queryType}`);
+        
+        // 根据查询类型决定获取哪些类型的记忆
+        let memoryTypeToFetch: 'all' | 'facts' | 'perceptions' | 'instructions' = 'all';
+        
+        // 根据查询类型进行智能过滤
+        if (queryType === 'factual') {
+          memoryTypeToFetch = 'facts';
+        } else if (queryType === 'experiential') {
+          memoryTypeToFetch = 'perceptions';
+        } else if (queryType === 'instructional') {
+          memoryTypeToFetch = 'instructions';
+        }
+        
+        // 使用按类型获取记忆的API，这将自动应用三维分类模型
+        const memories = await mem0Service.getChildMemoryByType(childID, memoryTypeToFetch);
+        
+        let importantMemoriesText = "\n\n# Child's Important Memories (基于认知心理学分类)\n";
+        importantMemoriesText += "\n> 以下记忆按照认知心理学模型分类：语义记忆(事实)、情景记忆(感知)、程序记忆(指令)\n";
+        
+        // 根据记忆内容包含的标签进行分组
+        const memoryGroups: Record<string, string[]> = {
+          '事实记忆': [],
+          '感知记忆': [],
+          '指令记忆': []
+        };
+        
+        // 将记忆按类型分组
+        memories.forEach(mem => {
+          if (mem.includes('[事实记忆]')) {
+            memoryGroups['事实记忆'].push(mem.replace(/\[事实记忆\]\s*\[语义记忆\]\s*/, ''));
+          } else if (mem.includes('[感知记忆]')) {
+            memoryGroups['感知记忆'].push(mem.replace(/\[感知记忆\]\s*\[情景记忆\]\s*/, ''));
+          } else if (mem.includes('[指令记忆]')) {
+            memoryGroups['指令记忆'].push(mem.replace(/\[指令记忆\]\s*\[程序记忆\]\s*/, ''));
+          } else {
+            // 如果没有明确的类型标签，添加到未分类组
+            if (!memoryGroups['其他']) memoryGroups['其他'] = [];
+            memoryGroups['其他'].push(mem);
+          }
+        });
+        
+        // 添加认知心理学解释
+        importantMemoriesText += "\n\n## 认知心理学记忆分类说明\n";
+        importantMemoriesText += "- **语义记忆(事实记忆)**: 存储客观知识和事实信息\n";
+        importantMemoriesText += "- **情景记忆(感知记忆)**: 存储个人经历和感受体验\n";
+        importantMemoriesText += "- **程序记忆(指令记忆)**: 存储操作步骤和行为指导\n";
+        
+        // 添加按类型分组的记忆
+        if (memoryGroups['事实记忆'].length > 0) {
+          importantMemoriesText += "\n\n## 语义记忆 - 事实信息\n";
+          importantMemoriesText += memoryGroups['事实记忆'].map(item => `- ${item}`).join('\n');
+        }
+        
+        if (memoryGroups['感知记忆'].length > 0) {
+          importantMemoriesText += "\n\n## 情景记忆 - 体验感受\n";
+          importantMemoriesText += memoryGroups['感知记忆'].map(item => `- ${item}`).join('\n');
+        }
+        
+        if (memoryGroups['指令记忆'].length > 0) {
+          importantMemoriesText += "\n\n## 程序记忆 - 操作指导\n";
+          importantMemoriesText += memoryGroups['指令记忆'].map(item => `- ${item}`).join('\n');
+        }
+        
+        // 添加未分类的记忆（如果有）
+        if (memoryGroups['其他'] && memoryGroups['其他'].length > 0) {
+          importantMemoriesText += "\n\n## 其他记忆信息\n";
+          importantMemoriesText += memoryGroups['其他'].map(item => `- ${item}`).join('\n');
+        }
+        
+        // 添加记忆类型统计信息
+        importantMemoriesText += "\n\n## 记忆类型统计\n";
+        importantMemoriesText += `- 语义记忆(事实记忆): ${memoryGroups['事实记忆'].length} 条\n`;
+        importantMemoriesText += `- 情景记忆(感知记忆): ${memoryGroups['感知记忆'].length} 条\n`;
+        importantMemoriesText += `- 程序记忆(指令记忆): ${memoryGroups['指令记忆'].length} 条\n`;
+        
+        // 为了兼容，同时尝试获取完整记忆对象
+        try {
+          const fullMemory = await mem0Service.search('*', {
+            user_id: childID,
+            limit: 1
+          });
+          
+          if (fullMemory.length > 0 && fullMemory[0].metadata && fullMemory[0].metadata.important_info) {
+            const importantInfo = fullMemory[0].metadata.important_info;
+            
+            // 如果三维分类不完整，回退到传统字段，确保不丢失信息
+            let hasTraditionalFields = false;
+            
+            if (importantInfo.name || 
+                (importantInfo.familyMembers && importantInfo.familyMembers.length > 0) ||
+                (importantInfo.friends && importantInfo.friends.length > 0)) {
+                
+                importantMemoriesText += "\n\n## 基本信息补充\n";
+                hasTraditionalFields = true;
+                
+                if (importantInfo.name) {
+                  importantMemoriesText += `\n- Child's name: ${importantInfo.name}`;
+                }
+                
+                if (importantInfo.familyMembers && importantInfo.familyMembers.length > 0) {
+                  importantMemoriesText += `\n\n- Family members: ${importantInfo.familyMembers.join(', ')}`;
+                }
+                
+                if (importantInfo.friends && importantInfo.friends.length > 0) {
+                  importantMemoriesText += `\n\n- Friends: ${importantInfo.friends.join(', ')}`;
+                }
+            }
+            
+            // 添加原始记忆内容作为参考
+            if (fullMemory[0].content) {
+              importantMemoriesText += "\n\n## 原始记忆参考\n";
+              importantMemoriesText += `${fullMemory[0].content.substring(0, 500)}${fullMemory[0].content.length > 500 ? '...' : ''}`;
+            }
+          }
+        } catch (legacyError) {
+          console.warn("获取传统记忆格式时出错:", legacyError);
+        }
+        
+        systemPrompt += importantMemoriesText;
+        console.log(`成功添加三维分类记忆到提示词中 - 总计 ${memories.length} 条记忆`);
+      } catch (error) {
+        console.error("读取mem0重要记忆时出错:", error);
+        // 继续执行，不中断流程
+      }
 
+      // 添加教学内容，整合strategy和teachingFocus
+      systemPrompt += `
+
+# Teaching Guidance
+`;
+      
       // 添加教学策略
-      systemPrompt += `\n\nTeaching strategy for this interaction: ${parsedPlanResult.strategy}\n`;
+      systemPrompt += `Teaching strategy: ${parsedPlanResult.strategy}\n`;
+      
+      // 添加教学重点（如果有）
+      if (parsedPlanResult?.teachingFocus) {
+        console.log("prompt add teaching focus:", parsedPlanResult);
+        systemPrompt += `Teaching focus: ${parsedPlanResult.teachingFocus}\n`;
+      }
       
       // 构建包含function call的提示词部分
       const functionCallInstruction = `
@@ -370,7 +604,7 @@ console.log(`[DEBUG] 生成的prompt: ${prompt}`);
     
     // 生成最终的prompt
     const promptStart = Date.now();
-    const prompt = generatePrompt(lastChildMessage);
+    const prompt = await generatePrompt(lastChildMessage);
     console.log(`[API_PERF] 生成prompt耗时: ${Date.now() - promptStart}ms`);
     
     // 存入缓存

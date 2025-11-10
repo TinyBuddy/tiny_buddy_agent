@@ -356,7 +356,8 @@ apiApp.post("/api/important-memories", async (c) => {
     // 调用mem0服务更新重要记忆
     const result = await mem0Service.updateImportantMemories({
       child_id: requestBody.child_id,
-      chat_history: requestBody.chat_history
+      chat_history: requestBody.chat_history,
+      memoryClassificationStrategy: 'cognitive_psychology' // 使用认知心理学模型（事实、感知、指令）
     });
 
     return c.json({
