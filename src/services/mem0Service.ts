@@ -264,13 +264,13 @@ async function extractImportantInfoWithAI(texts: string[], memoryClassificationS
           role: 'system',
           content: `You are a Memory Classification Specialist trained in cognitive psychology principles. Your task is to analyze children's conversations and extract important information for long-term memory storage.\n\n${memoryClassificationStrategy === 'cognitive_psychology' ? `## Memory Categories Based on Cognitive Psychology
 
-1. SEMANTIC MEMORY (语义记忆/事实记忆): Objective, factual information that can be verified. This includes:
+1. SEMANTIC MEMORY: Objective, factual information that can be verified. This includes:
    - Personal identifiers: names, age, birthday, gender
    - Relationships: family members, friends, classmates
    - Concrete facts: dates, locations, events with specific details
    - Verifiable information about the world
 
-2. EPISODIC MEMORY (情景记忆/感知记忆): Subjective experiences and personal perspectives. This includes:
+2. EPISODIC MEMORY: Subjective experiences and personal perspectives. This includes:
    - Feelings and emotions about specific experiences
    - Preferences and interests (likes/dislikes)
    - Personal opinions and attitudes
@@ -278,7 +278,7 @@ async function extractImportantInfoWithAI(texts: string[], memoryClassificationS
    - Dreams, aspirations, and future goals
    - Sensory experiences and perceptions
 
-3. PROCEDURAL MEMORY (程序记忆/指令记忆): Rules, instructions, and behavioral guidance. This includes:
+3. PROCEDURAL MEMORY: Rules, instructions, and behavioral guidance. This includes:
    - Learning objectives and educational goals
    - Behavioral expectations and guidelines
    - Preferences for interaction styles
@@ -299,13 +299,13 @@ Analyze the following conversation history and extract important information abo
 
 ## Memory Categories Based on Cognitive Psychology
 
-1. SEMANTIC MEMORY (语义记忆/事实记忆): Objective, factual information that can be verified. This includes:
+1. SEMANTIC MEMORY: Objective, factual information that can be verified. This includes:
    - Personal identifiers: names, age, birthday, gender
    - Relationships: family members, friends, classmates
    - Concrete facts: dates, locations, events with specific details
    - Verifiable information about the world
 
-2. EPISODIC MEMORY (情景记忆/感知记忆): Subjective experiences and personal perspectives. This includes:
+2. EPISODIC MEMORY: Subjective experiences and personal perspectives. This includes:
    - Feelings and emotions about specific experiences
    - Preferences and interests (likes/dislikes)
    - Personal opinions and attitudes
@@ -313,7 +313,7 @@ Analyze the following conversation history and extract important information abo
    - Dreams, aspirations, and future goals
    - Sensory experiences and perceptions
 
-3. PROCEDURAL MEMORY (程序记忆/指令记忆): Rules, instructions, and behavioral guidance. This includes:
+3. PROCEDURAL MEMORY: Rules, instructions, and behavioral guidance. This includes:
    - Learning objectives and educational goals
    - Behavioral expectations and guidelines
    - Preferences for interaction styles
@@ -951,32 +951,32 @@ export class Mem0Service {
       // 处理映射或直接使用原始类型
       const actualType = memoryTypeMap[memoryType] || memoryType;
       
-      // 中文类型标签映射，使输出更直观
+      // English type labels for intuitive output
       const typeLabels: Record<string, string> = {
-        'facts': '事实记忆',
-        'perceptions': '感知记忆',
-        'instructions': '指令记忆'
+        'facts': 'Factual Memory',
+        'perceptions': 'Perceptual Memory',
+        'instructions': 'Instructional Memory'
       };
-      
-      // 认知心理学对应术语映射
+
+      // Cognitive psychology terminology mapping
       const psychologyLabels: Record<string, string> = {
-        'facts': '语义记忆',
-        'perceptions': '情景记忆',
-        'instructions': '程序记忆'
+        'facts': 'Semantic Memory',
+        'perceptions': 'Episodic Memory',
+        'instructions': 'Procedural Memory'
       };
       
       switch (actualType) {
         case 'facts':
-          // 返回事实记忆，并添加双标签（中文描述和心理学分类）
+          // Return factual memories with dual labels (description and psychological classification)
           return (info.memoryByType.facts || []).map(mem => `[${typeLabels.facts}] [${psychologyLabels.facts}] ${mem}`);
         case 'perceptions':
-          // 返回感知记忆，并添加双标签
+          // Return perceptual memories with dual labels
           return (info.memoryByType.perceptions || []).map(mem => `[${typeLabels.perceptions}] [${psychologyLabels.perceptions}] ${mem}`);
         case 'instructions':
-          // 返回指令记忆，并添加双标签
+          // Return instructional memories with dual labels
           return (info.memoryByType.instructions || []).map(mem => `[${typeLabels.instructions}] [${psychologyLabels.instructions}] ${mem}`);
         case 'all':
-          // 返回所有类型的记忆，并添加双标签以增强可读性和学术准确性
+          // Return all types of memories with dual labels for enhanced readability and academic accuracy
           const factMemories = (info.memoryByType.facts || []).map(mem => `[${typeLabels.facts}] [${psychologyLabels.facts}] ${mem}`);
           const perceptionMemories = (info.memoryByType.perceptions || []).map(mem => `[${typeLabels.perceptions}] [${psychologyLabels.perceptions}] ${mem}`);
           const instructionMemories = (info.memoryByType.instructions || []).map(mem => `[${typeLabels.instructions}] [${psychologyLabels.instructions}] ${mem}`);
@@ -1022,18 +1022,18 @@ export class Mem0Service {
       // 处理映射或直接使用原始类型
       const actualType = memoryTypeMap[memoryType || 'all'] || (memoryType || 'all');
       
-      // 中文类型标签映射
+      // English type labels
       const typeLabels: Record<string, string> = {
-        'facts': '事实记忆',
-        'perceptions': '感知记忆',
-        'instructions': '指令记忆'
+        'facts': 'Factual Memory',
+        'perceptions': 'Perceptual Memory',
+        'instructions': 'Instructional Memory'
       };
-      
-      // 认知心理学对应术语映射
+
+      // Cognitive psychology terminology mapping
       const psychologyLabels: Record<string, string> = {
-        'facts': '语义记忆',
-        'perceptions': '情景记忆',
-        'instructions': '程序记忆'
+        'facts': 'Semantic Memory',
+        'perceptions': 'Episodic Memory',
+        'instructions': 'Procedural Memory'
       };
       
       // 收集需要搜索的记忆，同时保留其类型信息
@@ -1108,18 +1108,18 @@ export class Mem0Service {
           
           // 基于认知心理学模型的权重调整
           if (queryFeatures.isFactual && memory.type === 'facts') {
-            score *= 2.0; // 事实查询优先匹配事实记忆（语义记忆）
+            score *= 2.0; // Factual queries prioritize factual memories (semantic memory)
           } else if (queryFeatures.isExperiential && memory.type === 'perceptions') {
-            score *= 2.0; // 体验查询优先匹配感知记忆（情景记忆）
+            score *= 2.0; // Experiential queries prioritize perceptual memories (episodic memory)
           } else if (queryFeatures.isInstructional && memory.type === 'instructions') {
-            score *= 2.0; // 指令查询优先匹配指令记忆（程序记忆）
+            score *= 2.0; // Instructional queries prioritize instructional memories (procedural memory)
           }
           
-          // 错误匹配惩罚
+          // Penalty for incorrect matching
           if ((queryFeatures.isFactual && memory.type === 'instructions') ||
               (queryFeatures.isExperiential && memory.type === 'facts') ||
               (queryFeatures.isInstructional && memory.type === 'perceptions')) {
-            score *= 0.6; // 类型不匹配惩罚
+            score *= 0.6; // Type mismatch penalty
           }
           
           return { ...memory, score };
@@ -1172,22 +1172,22 @@ export class Mem0Service {
     typeLabels: Record<string, string>
   ): Promise<string[]> {
     try {
-      // 构建用于增强语义搜索的提示，明确要求考虑记忆类型的相关性
-      const systemMessage = `你是一个专业的记忆检索助手，专门基于认知心理学的记忆分类模型进行语义搜索。你的任务是分析每个记忆与查询的相关性，同时考虑内容相似度和记忆类型对查询上下文的适合性。
+      // Build a prompt for enhanced semantic search that explicitly considers memory type relevance
+      const systemMessage = `You are a professional memory retrieval assistant specializing in semantic search based on cognitive psychology's memory classification model. Your task is to analyze the relevance of each memory to the query, considering both content similarity and the suitability of memory types to the query context.
 
-记忆类型及其相关性指南：
-- 事实记忆 (Facts/Semantic): 存储客观事实和可验证的信息，如人名、日期、地点、事件等。最适合回答"谁"、"什么"、"何时"、"何地"等事实性问题。
-- 感知记忆 (Perceptions/Episodic): 存储个人体验、情感、偏好和主观感受。最适合回答关于感受、喜好、经历等问题。
-- 指令记忆 (Instructions/Procedural): 存储行为指导、规则、偏好设置和任务指令。最适合回答"如何"、"应该"等指导性问题。
+Memory Types and Relevance Guidelines:
+- Facts/Semantic Memory: Stores objective facts and verifiable information such as names, dates, places, events, etc. Best suited for answering factual questions like "who", "what", "when", "where".
+- Perceptions/Episodic Memory: Stores personal experiences, emotions, preferences, and subjective feelings. Best suited for answering questions about feelings, preferences, and experiences.
+- Instructions/Procedural Memory: Stores behavioral guidance, rules, preference settings, and task instructions. Best suited for answering "how" and "should" guidance questions.
 
-查询分析原则：
-1. 事实性查询(包含what、when、where、who、which等疑问词)优先匹配事实记忆
-2. 体验性查询(包含like、love、enjoy、feel、experience、remember、favorite等词)优先匹配感知记忆
-3. 指令性查询(包含should、must、need to、how to、remember to、don't等词)优先匹配指令记忆
+Query Analysis Principles:
+1. Factual queries (containing question words like what, when, where, who, which) should prioritize matching with factual memories
+2. Experiential queries (containing words like like, love, enjoy, feel, experience, remember, favorite) should prioritize matching with perceptual memories
+3. Instructional queries (containing words like should, must, need to, how to, remember to, don't) should prioritize matching with instructional memories
 
-对于每个查询，首先分析查询类型，然后根据上述原则确定最相关的记忆类型，最后综合评估内容相似度和类型适合性对记忆进行排序。返回最相关的记忆，按整体相关性排序。`;
+For each query, first analyze the query type, then determine the most relevant memory type based on the above principles, and finally comprehensively evaluate content similarity and type suitability to rank the memories. Return the most relevant memories, sorted by overall relevance.`;
       
-      const userMessage = `查询: ${query}\n\n待评估的记忆（格式：索引: [类型] 内容）:\n${memories.map((mem, idx) => `${idx}: [${typeLabels[mem.type]}] ${mem.content}`).join('\n')}\n\n指令：\n1. 首先分析查询类型（事实性、体验性还是指令性）\n2. 基于查询类型确定最相关的记忆类型\n3. 评估每个记忆内容与查询的语义相关性\n4. 结合记忆类型适合性和内容相关性计算综合得分\n5. 对记忆进行排序，优先考虑类型匹配且内容相关的记忆\n6. 仅返回相关记忆的索引，作为JSON数组，按整体相关性排序（最相关的在前）\n7. 确保返回的记忆真正相关，避免包含无关信息`;
+      const userMessage = `Query: ${query}\n\nMemories to evaluate (format: Index: [Type] Content):\n${memories.map((mem, idx) => `${idx}: [${typeLabels[mem.type]}] ${mem.content}`).join('\n')}\n\nInstructions:\n1. First analyze the query type (factual, experiential, or instructional)\n2. Determine the most relevant memory type based on the query type\n3. Evaluate the semantic relevance of each memory content to the query\n4. Calculate a comprehensive score combining memory type suitability and content relevance\n5. Sort the memories, prioritizing those with matching types and relevant content\n6. Return only the indices of relevant memories as a JSON array, sorted by overall relevance (most relevant first)\n7. Ensure the returned memories are truly relevant and avoid including irrelevant information`;
       
       const response = await getOpenAIClient().chat.completions.create({
         model: 'gpt-4.1',
@@ -1198,10 +1198,10 @@ export class Mem0Service {
         response_format: { type: 'json_object' }
       });
       
-      // 解析响应
+      // Parse the response
       const result = JSON.parse(response.choices[0].message.content || '[]');
       
-      // 根据索引获取相关记忆并添加中文类型标签
+      // Get relevant memories by index and add type labels
       return result
         .map((index: number) => {
           const memory = memories[index];
