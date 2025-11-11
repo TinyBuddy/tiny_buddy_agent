@@ -252,8 +252,53 @@ function cleanWord(word: string): string {
   return word.replace(EMOJI_REGEX, '').replace(/[?.,!;:]$/, '').trim();
 }
 
+// 定义短期状态表达，需要过滤掉的内容
+const TEMPORARY_STATE_EXPRESSIONS = [
+  'I am tired',
+  'I am hungry', 
+  'I am thirsty',
+  'I am sleepy',
+  'I am bored',
+  'I am happy',
+  'I am sad',
+  'I am angry',
+  'I am excited',
+  'I am scared',
+  'I need to pee',
+  'I need to go to the bathroom',
+  'I am cold',
+  'I am hot',
+  'I feel sick',
+  'I have a headache'
+];
+
+// 检查文本是否包含短期状态表达
+function containsTemporaryState(text: string): boolean {
+  const lowerText = text.toLowerCase();
+  return TEMPORARY_STATE_EXPRESSIONS.some(expr => 
+    lowerText.includes(expr.toLowerCase())
+  );
+}
+
+// 检查是否为重要的长期事件（具有前因后果或情绪影响）
+function isImportantLongTermEvent(text: string): boolean {
+  const importantIndicators = [
+    'because', 'so that', 'therefore', 'as a result',
+    'made me', 'caused me', 'affected me', 'changed me',
+    'remember when', 'that time when', 'one day',
+    'last week', 'last month', 'yesterday', 'today',
+    'first time', 'favorite memory', 'important to me'
+  ];
+  
+  const lowerText = text.toLowerCase();
+  return importantIndicators.some(indicator => 
+    lowerText.includes(indicator)
+  );
+}
+
 // 使用OpenAI API提取重要信息的异步函数 - 基于认知心理学记忆分类模型
-async function extractImportantInfoWithAI(texts: string[], memoryClassificationStrategy: 'cognitive_psychology' | 'traditional' = 'cognitive_psychology'): Promise<ImportantInfo> {
+// 增加可选的摘要参数，允许在一次调用中同时完成提取和摘要
+async function extractImportantInfoWithAI(texts: string[], memoryClassificationStrategy: 'cognitive_psychology' | 'traditional' = 'cognitive_psychology', includeSummary: boolean = false): Promise<ImportantInfo & { summaries?: Record<string, string> }> {
   try {
     const combinedText = texts.join('\n');
     
@@ -269,14 +314,17 @@ async function extractImportantInfoWithAI(texts: string[], memoryClassificationS
    - Relationships: family members, friends, classmates
    - Concrete facts: dates, locations, events with specific details
    - Verifiable information about the world
+   - Historical events with specific time markers (years, months, dates)
 
 2. EPISODIC MEMORY: Subjective experiences and personal perspectives. This includes:
-   - Feelings and emotions about specific experiences
-   - Preferences and interests (likes/dislikes)
-   - Personal opinions and attitudes
-   - Memories of past events with emotional significance
+   - Feelings and emotions about specific experiences with context
+   - Preferences and interests (likes/dislikes) that are enduring
+   - Personal opinions and attitudes that are relatively stable
+   - Memories of past events with emotional significance and context
+   - Long-term memories with time indicators ("last year", "two years ago", "when I was 5")
+   - Memories of important occasions (birthdays, holidays) with participants and significance
    - Dreams, aspirations, and future goals
-   - Sensory experiences and perceptions
+   - Sensory experiences and perceptions that are meaningful
 
 3. PROCEDURAL MEMORY: Rules, instructions, and behavioral guidance. This includes:
    - Learning objectives and educational goals
@@ -288,7 +336,7 @@ async function extractImportantInfoWithAI(texts: string[], memoryClassificationS
 Focus on extracting the following traditional categories of information:
 - Basic personal information: names, age, etc.
 - Interests and preferences
-- Important life events
+- Important life events with context
 - Family relationships
 - Friendships
 - Dreams and aspirations`}
@@ -306,12 +354,12 @@ Analyze the following conversation history and extract important information abo
    - Verifiable information about the world
 
 2. EPISODIC MEMORY: Subjective experiences and personal perspectives. This includes:
-   - Feelings and emotions about specific experiences
-   - Preferences and interests (likes/dislikes)
-   - Personal opinions and attitudes
-   - Memories of past events with emotional significance
+   - Feelings and emotions about specific experiences with context
+   - Preferences and interests (likes/dislikes) that are enduring
+   - Personal opinions and attitudes that are relatively stable
+   - Memories of past events with emotional significance and context
    - Dreams, aspirations, and future goals
-   - Sensory experiences and perceptions
+   - Sensory experiences and perceptions that are meaningful
 
 3. PROCEDURAL MEMORY: Rules, instructions, and behavioral guidance. This includes:
    - Learning objectives and educational goals
@@ -359,21 +407,126 @@ IMPORTANT INSTRUCTIONS:
 - Each memory entry should be a complete, standalone piece of information
 - Avoid redundant information across different memory categories
 - For facts category, focus on objective, verifiable information that can be confirmed
-- For perceptions category, emphasize subjective experiences, feelings, and personal perspectives
+- For perceptions category, emphasize subjective experiences, feelings, and personal perspectives with context
 - For instructions category, capture guidance, preferences, and behavioral expectations
+- EXCLUDE temporary states and fleeting emotions that lack context (e.g., "I am tired", "I am hungry")
+- INCLUDE emotional states ONLY when they have clear context, cause-effect relationships, or are part of an important event
+- For important events, include both the event and its emotional impact or significance
+- Focus on information that would be relevant for conversations hours or days later
+- SPECIAL FOCUS ON LONG-TERM MEMORIES:
+  - Extract memories with time indicators ("last year", "two years ago", "when I was 5", "in 2022")
+  - Prioritize memories of important occasions (birthdays, holidays, achievements) with details about participants
+  - For childhood memories, preserve both the event details and why it was memorable
+  - Include memories that show personal growth or significant life experiences
+  - When extracting long-term memories, include as much contextual information as possible (who, what, when, where, why)
+- Let the AI handle memory importance judgment rather than relying on simple pattern matching
 
 Return ONLY a valid JSON object with all required fields. Do not include any explanations or additional text outside the JSON.`
         },
         {
           role: 'user',
-          content: `Extract detailed information about the child from the following conversation, carefully categorizing into semantic (facts), episodic (perceptions), and procedural (instructions) memory types:\n${combinedText}`
+          content: `Extract detailed information about the child from the following conversation, carefully categorizing into semantic (facts), episodic (perceptions), and procedural (instructions) memory types:\n${combinedText}\n\nSpecial instructions for long-term memory extraction:\n- Pay special attention to memories with time indicators ("last year", "two years ago", "when I was 5", "in 2022")\n- Prioritize important occasions like birthdays, holidays, and achievements with details about who was involved\n- Include memories that were significant or memorable to the child\n- Preserve both event details and emotional significance for important memories\n- Extract information that would be meaningful to recall later, not temporary states\n- For childhood memories, include as much context as possible (who, what, when, where, why)\n- Focus on enduring preferences, stable relationships, and significant life events rather than fleeting emotions`
         }
       ],
       response_format: { type: 'json_object' }
     });
     
-    // Parse AI response JSON
+      // Parse AI response JSON - 这一步必须先执行！
     const aiResult = JSON.parse(completion.choices[0].message.content || '{}');
+    
+    // 如果需要生成摘要，在解析结果后再进行
+    if (includeSummary && aiResult.memoryByType) {
+      // 为每个记忆类型生成摘要
+      const summaries: Record<string, string> = {};
+      
+      // 定义摘要提示词
+      const summarySystemMessage = `You are a professional memory summarizer. Your task is to create a concise, coherent summary of the provided memories, maintaining the most important information and key points.`;
+      
+      // 对每个记忆类型生成摘要
+      const memoryTypes = [
+        { key: 'facts', label: 'Semantic Memory' },
+        { key: 'perceptions', label: 'Episodic Memory' },
+        { key: 'instructions', label: 'Procedural Memory' }
+      ];
+      
+      // 批量处理所有摘要
+      const summaryResults = await Promise.all(
+        memoryTypes.map(async (typeInfo) => {
+          const memories = aiResult.memoryByType[typeInfo.key] || [];
+          if (memories.length === 0) {
+            return { type: typeInfo.key, summary: '' };
+          }
+          
+          // 如果记忆数量较少，直接连接，避免API调用
+          if (memories.length <= 3) {
+            return { type: typeInfo.key, summary: memories.join(' ') };
+          }
+          
+          // 调用API生成摘要
+          try {
+            const summaryResponse = await getOpenAIClient().chat.completions.create({
+              model: 'gpt-4.1',
+              messages: [
+                { role: 'system', content: summarySystemMessage },
+                { 
+                  role: 'user', 
+                  content: `Please create a concise summary of the following ${typeInfo.label} memories. Focus on capturing the essential information, main themes, and important details while keeping the summary brief and well-structured:\n\n${memories.map((mem: string) => `- ${mem}`).join('\n')}`
+                }
+              ]
+            });
+            
+            return { 
+              type: typeInfo.key, 
+              summary: summaryResponse.choices[0].message.content || memories.join(' ') 
+            };
+          } catch (error) {
+            console.error(`生成${typeInfo.label}记忆摘要时出错: ${error instanceof Error ? error.message : String(error)}`);
+            return { type: typeInfo.key, summary: memories.join(' ') };
+          }
+        })
+      );
+      
+      // 收集摘要结果
+      summaryResults.forEach(result => {
+        if (result.summary) {
+          summaries[result.type] = result.summary;
+        }
+      });
+      
+      // 添加所有记忆的综合摘要
+      const allMemories = [
+        ...(aiResult.memoryByType.facts || []),
+        ...(aiResult.memoryByType.perceptions || []),
+        ...(aiResult.memoryByType.instructions || [])
+      ];
+      
+      if (allMemories.length > 0) {
+        if (allMemories.length <= 3) {
+          summaries['all'] = allMemories.join(' ');
+        } else {
+          try {
+            const allSummaryResponse = await getOpenAIClient().chat.completions.create({
+              model: 'gpt-4.1',
+              messages: [
+                { role: 'system', content: summarySystemMessage },
+                { 
+                  role: 'user', 
+                  content: `Please create a concise summary of all the following memories. Focus on capturing the essential information, main themes, and important details while keeping the summary brief and well-structured:\n\n${allMemories.map(mem => `- ${mem}`).join('\n')}`
+                }
+              ]
+            });
+            
+            summaries['all'] = allSummaryResponse.choices[0].message.content || allMemories.join(' ');
+          } catch (error) {
+            console.error(`生成所有记忆综合摘要时出错: ${error instanceof Error ? error.message : String(error)}`);
+            summaries['all'] = allMemories.join(' ');
+          }
+        }
+      }
+      
+      // 将摘要添加到返回结果中
+      return { ...aiResult, summaries };
+    }
     
     // Filter traditional fields
     const filteredInterests = aiResult.interests?.filter((item: string) => {
@@ -406,20 +559,31 @@ Return ONLY a valid JSON object with all required fields. Do not include any exp
       return item.trim().length > 2;
     }) || [];
     
-    // Filter three-dimensional memory classification
+    // Filter three-dimensional memory classification with additional logic for long-term memories
     const filteredFacts = aiResult.memoryByType?.facts?.filter((item: string) => {
       if (!item || typeof item !== 'string') return false;
-      return item.trim().length > 2;
+      const trimmed = item.trim();
+      return trimmed.length > 2 && !containsTemporaryState(trimmed);
     }) || [];
     
     const filteredPerceptions = aiResult.memoryByType?.perceptions?.filter((item: string) => {
       if (!item || typeof item !== 'string') return false;
-      return item.trim().length > 2;
+      const trimmed = item.trim();
+      if (trimmed.length <= 2) return false;
+      
+      // Filter out temporary states unless they are part of an important event with context
+      if (containsTemporaryState(trimmed)) {
+        // Keep only if it has clear context or cause-effect relationship
+        return isImportantLongTermEvent(trimmed);
+      }
+      
+      return true;
     }) || [];
     
     const filteredInstructions = aiResult.memoryByType?.instructions?.filter((item: string) => {
       if (!item || typeof item !== 'string') return false;
-      return item.trim().length > 2;
+      const trimmed = item.trim();
+      return trimmed.length > 2 && !containsTemporaryState(trimmed);
     }) || [];
     
     // Smart processing of three-dimensional classification to ensure sufficient content in each category
@@ -712,9 +876,9 @@ function extractImportantInfoWithRegex(texts: string[]): ImportantInfo {
 }
 
 // 主提取函数 - 默认使用AI提取
-async function extractImportantInfo(texts: string[], memoryClassificationStrategy: 'cognitive_psychology' | 'traditional' = 'cognitive_psychology'): Promise<ImportantInfo> {
+async function extractImportantInfo(texts: string[], memoryClassificationStrategy: 'cognitive_psychology' | 'traditional' = 'cognitive_psychology', includeSummary: boolean = false): Promise<ImportantInfo & { summaries?: Record<string, string> }> {
   // 首先尝试使用AI提取
-  return await extractImportantInfoWithAI(texts, memoryClassificationStrategy);
+  return await extractImportantInfoWithAI(texts, memoryClassificationStrategy, includeSummary);
 }
 
 // 检查是否包含重要信息
@@ -901,12 +1065,15 @@ export class Mem0Service {
     }
   }
   
-  // Get child important information
-  async getChildImportantInfo(childId: string): Promise<ImportantInfo> {
+  // Get child important information with optional summary support
+  async getChildImportantInfo(childId: string, includeSummary: boolean = false): Promise<ImportantInfo & { summaries?: Record<string, string> }> {
     try {
-      const memories = await this.getImportantMemoriesByChildId(childId);
+      const existingMemories = await this.search('*', {
+        user_id: childId,
+        limit: 10
+      });
       
-      if (memories.length === 0) {
+      if (existingMemories.length <= 0) {
         return {
           memoryByType: {
             facts: [],
@@ -916,11 +1083,86 @@ export class Mem0Service {
         };
       }
       
-      // Merge important information from all memories
-      const importantInfos = memories.map(mem => mem.metadata.important_info);
-      return this.mergeImportantInfo(importantInfos);
+      // 从现有记忆中提取重要信息
+      const existingImportantInfos = existingMemories
+        .filter(mem => mem.metadata && mem.metadata.important_info)
+        .map(mem => mem.metadata.important_info);
+      
+      if (existingImportantInfos.length <= 0) {
+        return {
+          memoryByType: {
+            facts: [],
+            perceptions: [],
+            instructions: []
+          }
+        };
+      }
+      
+      // 合并重要信息
+      const mergedInfo = this.mergeImportantInfo(existingImportantInfos);
+      
+      // 如果需要摘要，并且没有现成的摘要，生成摘要
+      if (includeSummary && !existingMemories[0].metadata?.summaries) {
+        // 为每个记忆类型生成摘要
+        const summaries: Record<string, string> = {};
+        
+        // 对每个记忆类型生成摘要
+        const memoryTypes = [
+          { key: 'facts', label: 'Semantic Memory' },
+          { key: 'perceptions', label: 'Episodic Memory' },
+          { key: 'instructions', label: 'Procedural Memory' }
+        ];
+        
+        // 批量处理所有摘要
+        const summaryResults = await Promise.all(
+          memoryTypes.map(async (typeInfo) => {
+            let memories: string[] = [];
+            // 安全访问不同类型的记忆
+            if (typeInfo.key === 'facts') {
+              memories = mergedInfo.memoryByType.facts || [];
+            } else if (typeInfo.key === 'perceptions') {
+              memories = mergedInfo.memoryByType.perceptions || [];
+            } else if (typeInfo.key === 'instructions') {
+              memories = mergedInfo.memoryByType.instructions || [];
+            }
+            const summary = await this.summarizeMemories(memories, typeInfo.label);
+            return { type: typeInfo.key, summary };
+          })
+        );
+        
+        // 收集摘要结果
+        summaryResults.forEach(result => {
+          if (result.summary) {
+            summaries[result.type] = result.summary;
+          }
+        });
+        
+        // 添加所有记忆的综合摘要
+        const allMemories = [
+          ...(mergedInfo.memoryByType.facts || []),
+          ...(mergedInfo.memoryByType.perceptions || []),
+          ...(mergedInfo.memoryByType.instructions || [])
+        ];
+        
+        if (allMemories.length > 0) {
+          summaries['all'] = await this.summarizeMemories(allMemories, 'Combined');
+        }
+        
+        // 将摘要添加到返回结果中
+        return { ...mergedInfo, summaries };
+      }
+      
+      // 如果已有摘要，直接返回
+      if (includeSummary && existingMemories[0].metadata?.summaries) {
+        return { 
+          ...mergedInfo, 
+          summaries: existingMemories[0].metadata.summaries 
+        };
+      }
+      
+      return mergedInfo;
     } catch (error) {
-      console.error(`Error getting child important information: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(`获取儿童重要信息时出错: ${error instanceof Error ? error.message : String(error)}`);
       return {
         memoryByType: {
           facts: [],
@@ -931,8 +1173,125 @@ export class Mem0Service {
     }
   }
   
+  // 摘要记忆内容的方法（保留向后兼容）
+  private async summarizeMemories(memories: string[], memoryType: string): Promise<string> {
+    // 实现摘要逻辑，与之前添加的summarizeMemories方法功能一致
+    if (memories.length === 0) {
+      return '';
+    }
+    
+    // 如果记忆数量较少，直接连接
+    if (memories.length <= 3) {
+      return memories.join(' ');
+    }
+    
+    // 否则使用GPT-4.1生成摘要
+    try {
+      const summaryResponse = await getOpenAIClient().chat.completions.create({
+        model: 'gpt-4.1',
+        messages: [
+          { 
+            role: 'system', 
+            content: 'You are a professional memory summarizer. Your task is to create a concise, coherent summary of the provided memories, maintaining the most important information and key points.' 
+          },
+          { 
+            role: 'user', 
+            content: `Please create a concise summary of the following ${memoryType} memories. Focus on capturing the essential information, main themes, and important details while keeping the summary brief and well-structured:\n\n${memories.map(mem => `- ${mem}`).join('\n')}`
+          }
+        ]
+      });
+      
+      return summaryResponse.choices[0].message.content || memories.join(' ');
+    } catch (error) {
+      console.error(`Error generating ${memoryType} summary: ${error instanceof Error ? error.message : String(error)}`);
+      return memories.join(' ');
+    }
+  }
+
   // 根据记忆类型获取儿童记忆 - 基于认知心理学分类模型（事实、感知、指令三维度）
-  async getChildMemoryByType(childId: string, memoryType: 'semantic' | 'episodic' | 'procedural' | 'facts' | 'perceptions' | 'instructions' | 'all'): Promise<string[]> {
+  async getChildMemoryByType(childId: string, memoryType: 'semantic' | 'episodic' | 'procedural' | 'facts' | 'perceptions' | 'instructions' | 'all', options?: { maxResults?: number, summarize?: boolean }): Promise<string[]> {
+    // 如果只需要摘要，返回格式为[摘要]的数组
+    if (options?.summarize) {
+      try {
+        // 请求包含摘要信息
+        const info = await this.getChildImportantInfo(childId, true);
+        
+        if (!info.memoryByType) {
+          return [];
+        }
+        
+        // 映射新的认知心理学术语到现有的字段名称
+        const memoryTypeMap: { [key: string]: string } = {
+          'semantic': 'facts',      // 语义记忆 = 事实记忆
+          'episodic': 'perceptions', // 情景记忆 = 感知记忆
+          'procedural': 'instructions' // 程序记忆 = 指令记忆
+        };
+        
+        // 处理映射或直接使用原始类型
+        const actualType = memoryTypeMap[memoryType] || memoryType;
+        
+        // 认知心理学术语
+        const psychologyLabels: Record<string, string> = {
+          'facts': 'Semantic Memory',
+          'perceptions': 'Episodic Memory',
+          'instructions': 'Procedural Memory'
+        };
+        
+        let memories: string[] = [];
+        let typeLabel = 'All Memories';
+        let summaryKey = 'all';
+        
+        switch (actualType) {
+          case 'facts':
+            memories = info.memoryByType.facts || [];
+            typeLabel = psychologyLabels['facts'];
+            summaryKey = 'facts';
+            break;
+          case 'perceptions':
+            memories = info.memoryByType.perceptions || [];
+            typeLabel = psychologyLabels['perceptions'];
+            summaryKey = 'perceptions';
+            break;
+          case 'instructions':
+            memories = info.memoryByType.instructions || [];
+            typeLabel = psychologyLabels['instructions'];
+            summaryKey = 'instructions';
+            break;
+          case 'all':
+            memories = [
+              ...(info.memoryByType.facts || []),
+              ...(info.memoryByType.perceptions || []),
+              ...(info.memoryByType.instructions || [])
+            ];
+            summaryKey = 'all';
+            break;
+          default:
+            return [];
+        }
+        
+        // 应用maxResults限制
+        const maxResults = options?.maxResults || 20;
+        const limitedMemories = memories.slice(0, maxResults);
+        
+        // 首先尝试使用存储的摘要
+        let summary: string;
+        if (info.summaries && info.summaries[summaryKey]) {
+          summary = info.summaries[summaryKey];
+          console.log(`使用存储的${typeLabel}摘要`);
+        } else {
+          // 生成摘要
+          summary = await this.summarizeMemories(limitedMemories, typeLabel);
+          console.log(`生成新的${typeLabel}摘要`);
+        }
+        
+        // 返回带类型标签的摘要
+        return [`[SUMMARY] [${typeLabel}] ${summary}`];
+      } catch (error) {
+        console.error(`获取并摘要儿童记忆时出错: ${error instanceof Error ? error.message : String(error)}`);
+        return [];
+      }
+    }
+    // 以下是原有的非摘要逻辑...
     try {
       const info = await this.getChildImportantInfo(childId);
       
@@ -965,22 +1324,42 @@ export class Mem0Service {
         'instructions': 'Procedural Memory'
       };
       
+      // Function to process memories with prioritization and English content ensure
+      const processMemories = (memories: string[], type: string): string[] => {
+        // Ensure all memories are in English
+        const englishMemories = memories.map(mem => {
+          // Assuming memories are already in English from extraction process
+          // If needed, we could add translation logic here
+          return mem;
+        });
+        
+        // Add type labels
+        const labeledMemories = englishMemories.map(mem => 
+          `[${typeLabels[type]}] [${psychologyLabels[type]}] ${mem}`
+        );
+        
+        // Apply maxResults limit if specified
+        const maxResults = options?.maxResults || 10; // Default to 10 if not specified
+        return labeledMemories.slice(0, maxResults);
+      };
+      
       switch (actualType) {
         case 'facts':
-          // Return factual memories with dual labels (description and psychological classification)
-          return (info.memoryByType.facts || []).map(mem => `[${typeLabels.facts}] [${psychologyLabels.facts}] ${mem}`);
+          // Return prioritized factual memories with dual labels
+          return processMemories(info.memoryByType.facts || [], 'facts');
         case 'perceptions':
-          // Return perceptual memories with dual labels
-          return (info.memoryByType.perceptions || []).map(mem => `[${typeLabels.perceptions}] [${psychologyLabels.perceptions}] ${mem}`);
+          // Return prioritized perceptual memories with dual labels
+          return processMemories(info.memoryByType.perceptions || [], 'perceptions');
         case 'instructions':
-          // Return instructional memories with dual labels
-          return (info.memoryByType.instructions || []).map(mem => `[${typeLabels.instructions}] [${psychologyLabels.instructions}] ${mem}`);
+          // Return prioritized instructional memories with dual labels
+          return processMemories(info.memoryByType.instructions || [], 'instructions');
         case 'all':
-          // Return all types of memories with dual labels for enhanced readability and academic accuracy
-          const factMemories = (info.memoryByType.facts || []).map(mem => `[${typeLabels.facts}] [${psychologyLabels.facts}] ${mem}`);
-          const perceptionMemories = (info.memoryByType.perceptions || []).map(mem => `[${typeLabels.perceptions}] [${psychologyLabels.perceptions}] ${mem}`);
-          const instructionMemories = (info.memoryByType.instructions || []).map(mem => `[${typeLabels.instructions}] [${psychologyLabels.instructions}] ${mem}`);
+          // Process each type separately with prioritization
+          const factMemories = processMemories(info.memoryByType.facts || [], 'facts');
+          const perceptionMemories = processMemories(info.memoryByType.perceptions || [], 'perceptions');
+          const instructionMemories = processMemories(info.memoryByType.instructions || [], 'instructions');
           
+          // Combine all memories with type-specific priorities
           return [...factMemories, ...perceptionMemories, ...instructionMemories];
         default:
           return [];
@@ -1215,13 +1594,14 @@ For each query, first analyze the query type, then determine the most relevant m
   }
 
   // 统一接口：更新重要记忆 - 使用新的官方SDK方法
-  async updateImportantMemories(req: UpdateImportantMemoriesRequest): Promise<{
+  async updateImportantMemories(req: UpdateImportantMemoriesRequest & { includeSummary?: boolean }): Promise<{
     success: boolean;
     message: string;
     important_info?: ImportantInfo;
     stored_memory?: ImportantMemory;
     error_code?: string;
     error_details?: string;
+    summary?: string;
   }> {
     const MEM0_ENABLED = process.env.MEM0_ENABLED === 'true';
     if (!MEM0_ENABLED) {
@@ -1237,9 +1617,12 @@ For each query, first analyze the query type, then determine the most relevant m
       
       console.log(`开始更新孩子 ${child_id} 的重要记忆`);
       
-      // 1. 提取新的重要信息 - 使用异步方法，并传递记忆分类策略
-      const newImportantInfo = await extractImportantInfo(chat_history, memoryClassificationStrategy);
+      // 1. 提取新的重要信息 - 使用异步方法，并传递记忆分类策略和是否需要摘要
+      const extractResult = await extractImportantInfo(chat_history, memoryClassificationStrategy, req.includeSummary);
+      const newImportantInfo = extractResult;
+      const summaries = 'summaries' in extractResult ? extractResult.summaries : undefined;
       console.log('提取到的重要信息:', JSON.stringify(newImportantInfo));
+      console.log('生成的摘要:', summaries);
       
       // 如果没有提取到重要信息，尝试返回历史重要信息
       if (!hasImportantInfo(newImportantInfo)) {
@@ -1306,7 +1689,9 @@ For each query, first analyze the query type, then determine the most relevant m
           important_info: finalImportantInfo,
           created_at: existingMemories[0].metadata?.created_at || timestamp,
           updated_at: timestamp,
-          child_id: child_id
+          child_id: child_id,
+          // 如果有摘要，保存到metadata中
+          ...(summaries && { summaries })
         };
         
         // 使用新的update接口更新记忆
@@ -1340,7 +1725,9 @@ For each query, first analyze the query type, then determine the most relevant m
         important_info: finalImportantInfo,
         created_at: timestamp,
         updated_at: timestamp,
-        agent_id: AGENT_ID
+        agent_id: AGENT_ID,
+        // 如果有摘要，保存到metadata中
+        ...(summaries && { summaries })
       };
       
       // 使用新的add方法创建记忆
@@ -1425,32 +1812,51 @@ For each query, first analyze the query type, then determine the most relevant m
     };
     
     infoList.forEach(info => {
-      // Merge 3D memory structure
-      if (info.memoryByType) {
-        // Merge factual memories
-        const validFacts = info.memoryByType.facts?.filter(item => 
-          item && item.trim().length > 2 && item.trim() !== 'null' && item.trim() !== 'undefined'
-        ) || [];
-        merged.memoryByType.facts.push(...validFacts);
+      // Merge 3D memory structure with filtering for long-term significance
+    if (info.memoryByType) {
+      // Merge factual memories
+      const validFacts = info.memoryByType.facts?.filter(item => 
+        item && item.trim().length > 2 && 
+        item.trim() !== 'null' && item.trim() !== 'undefined' &&
+        !containsTemporaryState(item.trim())
+      ) || [];
+      merged.memoryByType.facts.push(...validFacts);
+      
+      // Merge perceptual memories with special filtering for temporary states
+      const validPerceptions = info.memoryByType.perceptions?.filter(item => {
+        if (!item) return false;
+        const trimmed = item.trim();
+        if (trimmed.length <= 2 || trimmed === 'null' || trimmed === 'undefined') return false;
         
-        // Merge perceptual memories
-        const validPerceptions = info.memoryByType.perceptions?.filter(item => 
-          item && item.trim().length > 2 && item.trim() !== 'null' && item.trim() !== 'undefined'
-        ) || [];
-        merged.memoryByType.perceptions.push(...validPerceptions);
+        // Filter out temporary states unless they have important context
+        if (containsTemporaryState(trimmed)) {
+          return isImportantLongTermEvent(trimmed);
+        }
         
-        // Merge instructional memories
-        const validInstructions = info.memoryByType.instructions?.filter(item => 
-          item && item.trim().length > 2 && item.trim() !== 'null' && item.trim() !== 'undefined'
-        ) || [];
-        merged.memoryByType.instructions.push(...validInstructions);
-      }
+        return true;
+      }) || [];
+      merged.memoryByType.perceptions.push(...validPerceptions);
+      
+      // Merge instructional memories
+      const validInstructions = info.memoryByType.instructions?.filter(item => 
+        item && item.trim().length > 2 && 
+        item.trim() !== 'null' && item.trim() !== 'undefined' &&
+        !containsTemporaryState(item.trim())
+      ) || [];
+      merged.memoryByType.instructions.push(...validInstructions);
+    }
     });
     
     // Deduplicate memory arrays
     merged.memoryByType.facts = [...new Set(merged.memoryByType.facts)];
     merged.memoryByType.perceptions = [...new Set(merged.memoryByType.perceptions)];
     merged.memoryByType.instructions = [...new Set(merged.memoryByType.instructions)];
+    
+    // Limit the number of memories to prevent excessive accumulation
+    const MAX_MEMORIES_PER_TYPE = 20;
+    merged.memoryByType.facts = merged.memoryByType.facts.slice(0, MAX_MEMORIES_PER_TYPE);
+    merged.memoryByType.perceptions = merged.memoryByType.perceptions.slice(0, MAX_MEMORIES_PER_TYPE);
+    merged.memoryByType.instructions = merged.memoryByType.instructions.slice(0, MAX_MEMORIES_PER_TYPE);
     
     return merged;
   }
@@ -1465,23 +1871,29 @@ For each query, first analyze the query type, then determine the most relevant m
     if (info.memoryByType) {
       // 1. Semantic Memory (Facts) - objective knowledge
       if (info.memoryByType.facts.length > 0) {
+        // Limit to 10 most important facts
+        const limitedFacts = info.memoryByType.facts.slice(0, 10);
         content += `## 1. Semantic Memory\n`;
         content += `Objective factual information that can be verified:\n`;
-        content += `${info.memoryByType.facts.map(item => `- ${item}`).join('\n')}\n\n`;
+        content += `${limitedFacts.map(item => `- ${item}`).join('\n')}\n\n`;
       }
       
       // 2. Episodic Memory (Perceptions) - subjective experiences
       if (info.memoryByType.perceptions.length > 0) {
+        // Limit to 10 most important perceptions
+        const limitedPerceptions = info.memoryByType.perceptions.slice(0, 10);
         content += `## 2. Episodic Memory\n`;
         content += `Subjective experiences and personal perspectives:\n`;
-        content += `${info.memoryByType.perceptions.map(item => `- ${item}`).join('\n')}\n\n`;
+        content += `${limitedPerceptions.map(item => `- ${item}`).join('\n')}\n\n`;
       }
       
       // 3. Procedural Memory (Instructions) - guidance rules
       if (info.memoryByType.instructions.length > 0) {
+        // Limit to 10 most important instructions
+        const limitedInstructions = info.memoryByType.instructions.slice(0, 10);
         content += `## 3. Procedural Memory\n`;
         content += `Rules, instructions, and behavioral guidance:\n`;
-        content += `${info.memoryByType.instructions.map(item => `- ${item}`).join('\n')}\n\n`;
+        content += `${limitedInstructions.map(item => `- ${item}`).join('\n')}\n\n`;
       }
     }
     
