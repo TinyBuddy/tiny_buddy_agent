@@ -78,7 +78,8 @@ export async function POST(request: NextRequest) {
       // 调用mem0服务更新重要记忆
       const mem0Result = await mem0Service.updateImportantMemories({
         child_id: childID,
-        chat_history: chatHistoryForMem0
+        chat_history: chatHistoryForMem0,
+        memoryClassificationStrategy: 'cognitive_psychology' // 使用认知心理学模型（事实、感知、指令）
       });
       
       console.log(`mem0处理结果: ${mem0Result.success ? '成功' : '失败'} - ${mem0Result.message}`);
