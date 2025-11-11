@@ -314,11 +314,13 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
       console.log(`处理儿童 ${childID} 的历史记忆，准备提取重要信息`);
       
       // 调用mem0服务更新重要记忆，使用三维记忆分类模型
-      const mem0Result = await mem0Service.updateImportantMemories({
-        child_id: childID,
-        chat_history: chatHistoryForMem0,
+      const mem0Result = await mem0Service.updateImportantMemories({  
+        child_id: childID,  
+        chat_history: chatHistoryForMem0,  
         // 添加记忆分类策略参数，使用认知心理学模型（事实、感知、指令）
-        memoryClassificationStrategy: 'cognitive_psychology'
+        memoryClassificationStrategy: 'cognitive_psychology',
+        // 添加includeSummary参数以生成并存储摘要信息
+        includeSummary: true  
       });
       
       console.log(`mem0处理结果: ${mem0Result.success ? '成功' : '失败'} - ${mem0Result.message}`);
@@ -443,7 +445,9 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
         }
         
         // Use the API to get memories by type, which will automatically apply the three-dimensional classification model
-        const memories = await mem0Service.getChildMemoryByType(childID, memoryTypeToFetch);
+        // Add maxResults parameter to limit the number of memories
+        // Add summarize: true to use stored summaries when available, reducing GPT-4.1 calls
+        const memories = await mem0Service.getChildMemoryByType(childID, memoryTypeToFetch, { maxResults: 5, summarize: true });
         
         let importantMemoriesText = "\n\n# Child's Important Memories (Based on Cognitive Psychology Classification)\n";
         importantMemoriesText += "\n> The following memories are classified according to cognitive psychology model: Semantic Memory (Facts), Episodic Memory (Perceptions), Procedural Memory (Instructions)\n";
@@ -455,26 +459,48 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
           'Instructional Memory': []
         };
         
-        // Group memories by type
+        // Group memories by type and ensure they are in English
         memories.forEach(mem => {
-          if (mem.includes('[Factual Memory]')) {
-            memoryGroups['Factual Memory'].push(mem.replace(/\[Factual Memory\]\s*\[Semantic Memory\]\s*/, ''));
-          } else if (mem.includes('[Perceptual Memory]')) {
-            memoryGroups['Perceptual Memory'].push(mem.replace(/\[Perceptual Memory\]\s*\[Episodic Memory\]\s*/, ''));
-          } else if (mem.includes('[Instructional Memory]')) {
-            memoryGroups['Instructional Memory'].push(mem.replace(/\[Instructional Memory\]\s*\[Procedural Memory\]\s*/, ''));
+          // Ensure memory content is in English
+          const englishMem = mem; // Assuming memories are already in English from mem0Service
+          
+          if (englishMem.includes('[Factual Memory]')) {
+            memoryGroups['Factual Memory'].push(englishMem.replace(/\[Factual Memory\]\s*\[Semantic Memory\]\s*/, ''));
+          } else if (englishMem.includes('[Perceptual Memory]')) {
+            memoryGroups['Perceptual Memory'].push(englishMem.replace(/\[Perceptual Memory\]\s*\[Episodic Memory\]\s*/, ''));
+          } else if (englishMem.includes('[Instructional Memory]')) {
+            memoryGroups['Instructional Memory'].push(englishMem.replace(/\[Instructional Memory\]\s*\[Procedural Memory\]\s*/, ''));
           } else {
             // If no clear type tag, add to unclassified group
             if (!memoryGroups['Other']) memoryGroups['Other'] = [];
-            memoryGroups['Other'].push(mem);
+            memoryGroups['Other'].push(englishMem);
           }
         });
         
-        // Add cognitive psychology explanation
-        importantMemoriesText += "\n\n## Cognitive Psychology Memory Classification Explanation\n";
-        importantMemoriesText += "- **Semantic Memory (Factual Memory)**: Stores objective knowledge and factual information\n";
-        importantMemoriesText += "- **Episodic Memory (Perceptual Memory)**: Stores personal experiences and emotional feelings\n";
-        importantMemoriesText += "- **Procedural Memory (Instructional Memory)**: Stores operation steps and behavioral guidance\n";
+        // Function to summarize memories to prevent prompt explosion
+        const summarizeMemories = (memories: string[], maxLengthPerMemory: number = 100): string[] => {
+          return memories.map(mem => {
+            // Simple summarization: truncate if too long
+            if (mem.length > maxLengthPerMemory) {
+              return mem.substring(0, maxLengthPerMemory - 3) + '...';
+            }
+            return mem;
+          });
+        };
+        
+        // Summarize each type of memory
+        memoryGroups['Factual Memory'] = summarizeMemories(memoryGroups['Factual Memory']);
+        memoryGroups['Perceptual Memory'] = summarizeMemories(memoryGroups['Perceptual Memory']);
+        memoryGroups['Instructional Memory'] = summarizeMemories(memoryGroups['Instructional Memory']);
+        if (memoryGroups['Other']) {
+          memoryGroups['Other'] = summarizeMemories(memoryGroups['Other']);
+        }
+        
+        // Add concise cognitive psychology explanation
+        importantMemoriesText += "\n\n## Memory Classification\n";
+        importantMemoriesText += "- **Semantic (Factual)**: Objective knowledge and facts\n";
+        importantMemoriesText += "- **Episodic (Perceptual)**: Personal experiences and feelings\n";
+        importantMemoriesText += "- **Procedural (Instructional)**: Operation steps and guidance\n";
         
         // Add memories grouped by type
         if (memoryGroups['Factual Memory'].length > 0) {
