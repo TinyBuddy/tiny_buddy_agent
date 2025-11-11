@@ -504,7 +504,7 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
         importantMemoriesText += `- Episodic Memory (Perceptual Memory): ${memoryGroups['Perceptual Memory'].length} items\n`;
         importantMemoriesText += `- Procedural Memory (Instructional Memory): ${memoryGroups['Instructional Memory'].length} items\n`;
         
-        // 为了兼容，同时尝试获取完整记忆对象
+        // For compatibility, also try to retrieve complete memory objects
         try {
           const fullMemory = await mem0Service.search('*', {
             user_id: childID,
@@ -514,14 +514,14 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
           if (fullMemory.length > 0 && fullMemory[0].metadata && fullMemory[0].metadata.important_info) {
             const importantInfo = fullMemory[0].metadata.important_info;
             
-            // 如果三维分类不完整，回退到传统字段，确保不丢失信息
+            // Fallback to traditional fields if 3D classification is incomplete, ensuring no information loss
             let hasTraditionalFields = false;
             
             if (importantInfo.name || 
                 (importantInfo.familyMembers && importantInfo.familyMembers.length > 0) ||
                 (importantInfo.friends && importantInfo.friends.length > 0)) {
                 
-                importantMemoriesText += "\n\n## 基本信息补充\n";
+                importantMemoriesText += "\n\n## Basic Information Supplement\n";
                 hasTraditionalFields = true;
                 
                 if (importantInfo.name) {
@@ -537,14 +537,14 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
                 }
             }
             
-            // 添加原始记忆内容作为参考
+            // Add original memory content as reference
             if (fullMemory[0].content) {
-              importantMemoriesText += "\n\n## 原始记忆参考\n";
+              importantMemoriesText += "\n\n## Original Memory Reference\n";
               importantMemoriesText += `${fullMemory[0].content.substring(0, 500)}${fullMemory[0].content.length > 500 ? '...' : ''}`;
             }
           }
         } catch (legacyError) {
-          console.warn("获取传统记忆格式时出错:", legacyError);
+          console.warn("Error retrieving traditional memory format:", legacyError);
         }
         
         systemPrompt += importantMemoriesText;
