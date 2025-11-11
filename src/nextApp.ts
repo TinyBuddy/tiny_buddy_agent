@@ -389,51 +389,51 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
       // 从全局配置获取系统提示词，确保使用正确的儿童年龄
       let systemPrompt = getFullSystemPrompt(childProfile);
       
-      // 从mem0读取重要记忆并添加到提示词中 - 基于三维记忆分类模型优化
+      // Retrieve important memories from mem0 and add to prompt - optimized based on three-dimensional memory classification model
       try {
-        console.log(`从mem0读取儿童 ${childID} 的重要记忆`);
+        console.log(`Retrieving important memories for child ${childID} from mem0`);
         
-        // 使用增强的语义搜索方法获取相关记忆
-        // 基于当前输入和历史消息，智能判断需要哪些类型的记忆
+        // Use enhanced semantic search to get relevant memories
+        // Intelligently determine which types of memories are needed based on current input and history
         const lastChildMessage = historyMsgs.length > 0 ? historyMsgs[historyMsgs.length - 1].child : "Hello";
         
-        // 获取当前查询类型 - 本地实现分析逻辑，与mem0Service保持一致
+        // Get current query type - local implementation of analysis logic, consistent with mem0Service
          const analyzeQueryType = (query: string): 'factual' | 'experiential' | 'instructional' | 'mixed' => {
            const lowerQuery = query.toLowerCase();
            
-           // 事实性查询模式
+           // Factual query patterns
            const factualPatterns = /what|when|where|who|which|how many|how much|facts|information|details/;
-           // 体验性查询模式
+           // Experiential query patterns
            const experientialPatterns = /like|love|enjoy|feel|experience|remember|favorite|hate|dislike|happy|sad/;
-           // 指令性查询模式
+           // Instructional query patterns
            const instructionalPatterns = /should|must|need to|how to|remember to|don't|shouldn't|avoid|tips|guide/;
            
            const isFactual = factualPatterns.test(lowerQuery);
            const isExperiential = experientialPatterns.test(lowerQuery);
            const isInstructional = instructionalPatterns.test(lowerQuery);
            
-           // 统计匹配的类型数量
+           // Count the number of matching types
            const matchCount = [isFactual, isExperiential, isInstructional].filter(Boolean).length;
            
-           // 如果只匹配一种类型，返回该类型
+           // If only one type matches, return that type
            if (matchCount === 1) {
              if (isFactual) return 'factual';
              if (isExperiential) return 'experiential';
              if (isInstructional) return 'instructional';
            }
            
-           // 多种类型匹配，返回混合类型
+           // Multiple types match, return mixed type
            return 'mixed';
          };
          
          const queryType = analyzeQueryType(lastChildMessage);
           
-        console.log(`查询类型分析结果: ${queryType}`);
+        console.log(`Query type analysis result: ${queryType}`);
         
-        // 根据查询类型决定获取哪些类型的记忆
+        // Determine which types of memories to retrieve based on query type
         let memoryTypeToFetch: 'all' | 'facts' | 'perceptions' | 'instructions' = 'all';
         
-        // 根据查询类型进行智能过滤
+        // Intelligent filtering based on query type
         if (queryType === 'factual') {
           memoryTypeToFetch = 'facts';
         } else if (queryType === 'experiential') {
@@ -442,69 +442,69 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
           memoryTypeToFetch = 'instructions';
         }
         
-        // 使用按类型获取记忆的API，这将自动应用三维分类模型
+        // Use the API to get memories by type, which will automatically apply the three-dimensional classification model
         const memories = await mem0Service.getChildMemoryByType(childID, memoryTypeToFetch);
         
-        let importantMemoriesText = "\n\n# Child's Important Memories (基于认知心理学分类)\n";
-        importantMemoriesText += "\n> 以下记忆按照认知心理学模型分类：语义记忆(事实)、情景记忆(感知)、程序记忆(指令)\n";
+        let importantMemoriesText = "\n\n# Child's Important Memories (Based on Cognitive Psychology Classification)\n";
+        importantMemoriesText += "\n> The following memories are classified according to cognitive psychology model: Semantic Memory (Facts), Episodic Memory (Perceptions), Procedural Memory (Instructions)\n";
         
-        // 根据记忆内容包含的标签进行分组
+        // Group memories by their type tags
         const memoryGroups: Record<string, string[]> = {
-          '事实记忆': [],
-          '感知记忆': [],
-          '指令记忆': []
+          'Factual Memory': [],
+          'Perceptual Memory': [],
+          'Instructional Memory': []
         };
         
-        // 将记忆按类型分组
+        // Group memories by type
         memories.forEach(mem => {
-          if (mem.includes('[事实记忆]')) {
-            memoryGroups['事实记忆'].push(mem.replace(/\[事实记忆\]\s*\[语义记忆\]\s*/, ''));
-          } else if (mem.includes('[感知记忆]')) {
-            memoryGroups['感知记忆'].push(mem.replace(/\[感知记忆\]\s*\[情景记忆\]\s*/, ''));
-          } else if (mem.includes('[指令记忆]')) {
-            memoryGroups['指令记忆'].push(mem.replace(/\[指令记忆\]\s*\[程序记忆\]\s*/, ''));
+          if (mem.includes('[Factual Memory]')) {
+            memoryGroups['Factual Memory'].push(mem.replace(/\[Factual Memory\]\s*\[Semantic Memory\]\s*/, ''));
+          } else if (mem.includes('[Perceptual Memory]')) {
+            memoryGroups['Perceptual Memory'].push(mem.replace(/\[Perceptual Memory\]\s*\[Episodic Memory\]\s*/, ''));
+          } else if (mem.includes('[Instructional Memory]')) {
+            memoryGroups['Instructional Memory'].push(mem.replace(/\[Instructional Memory\]\s*\[Procedural Memory\]\s*/, ''));
           } else {
-            // 如果没有明确的类型标签，添加到未分类组
-            if (!memoryGroups['其他']) memoryGroups['其他'] = [];
-            memoryGroups['其他'].push(mem);
+            // If no clear type tag, add to unclassified group
+            if (!memoryGroups['Other']) memoryGroups['Other'] = [];
+            memoryGroups['Other'].push(mem);
           }
         });
         
-        // 添加认知心理学解释
-        importantMemoriesText += "\n\n## 认知心理学记忆分类说明\n";
-        importantMemoriesText += "- **语义记忆(事实记忆)**: 存储客观知识和事实信息\n";
-        importantMemoriesText += "- **情景记忆(感知记忆)**: 存储个人经历和感受体验\n";
-        importantMemoriesText += "- **程序记忆(指令记忆)**: 存储操作步骤和行为指导\n";
+        // Add cognitive psychology explanation
+        importantMemoriesText += "\n\n## Cognitive Psychology Memory Classification Explanation\n";
+        importantMemoriesText += "- **Semantic Memory (Factual Memory)**: Stores objective knowledge and factual information\n";
+        importantMemoriesText += "- **Episodic Memory (Perceptual Memory)**: Stores personal experiences and emotional feelings\n";
+        importantMemoriesText += "- **Procedural Memory (Instructional Memory)**: Stores operation steps and behavioral guidance\n";
         
-        // 添加按类型分组的记忆
-        if (memoryGroups['事实记忆'].length > 0) {
-          importantMemoriesText += "\n\n## 语义记忆 - 事实信息\n";
-          importantMemoriesText += memoryGroups['事实记忆'].map(item => `- ${item}`).join('\n');
+        // Add memories grouped by type
+        if (memoryGroups['Factual Memory'].length > 0) {
+          importantMemoriesText += "\n\n## Semantic Memory - Factual Information\n";
+          importantMemoriesText += memoryGroups['Factual Memory'].map(item => `- ${item}`).join('\n');
         }
         
-        if (memoryGroups['感知记忆'].length > 0) {
-          importantMemoriesText += "\n\n## 情景记忆 - 体验感受\n";
-          importantMemoriesText += memoryGroups['感知记忆'].map(item => `- ${item}`).join('\n');
+        if (memoryGroups['Perceptual Memory'].length > 0) {
+          importantMemoriesText += "\n\n## Episodic Memory - Experiential Feelings\n";
+          importantMemoriesText += memoryGroups['Perceptual Memory'].map(item => `- ${item}`).join('\n');
         }
         
-        if (memoryGroups['指令记忆'].length > 0) {
-          importantMemoriesText += "\n\n## 程序记忆 - 操作指导\n";
-          importantMemoriesText += memoryGroups['指令记忆'].map(item => `- ${item}`).join('\n');
+        if (memoryGroups['Instructional Memory'].length > 0) {
+          importantMemoriesText += "\n\n## Procedural Memory - Operational Guidance\n";
+          importantMemoriesText += memoryGroups['Instructional Memory'].map(item => `- ${item}`).join('\n');
         }
         
-        // 添加未分类的记忆（如果有）
-        if (memoryGroups['其他'] && memoryGroups['其他'].length > 0) {
-          importantMemoriesText += "\n\n## 其他记忆信息\n";
-          importantMemoriesText += memoryGroups['其他'].map(item => `- ${item}`).join('\n');
+        // Add unclassified memories (if any)
+        if (memoryGroups['Other'] && memoryGroups['Other'].length > 0) {
+          importantMemoriesText += "\n\n## Other Memory Information\n";
+          importantMemoriesText += memoryGroups['Other'].map(item => `- ${item}`).join('\n');
         }
         
-        // 添加记忆类型统计信息
-        importantMemoriesText += "\n\n## 记忆类型统计\n";
-        importantMemoriesText += `- 语义记忆(事实记忆): ${memoryGroups['事实记忆'].length} 条\n`;
-        importantMemoriesText += `- 情景记忆(感知记忆): ${memoryGroups['感知记忆'].length} 条\n`;
-        importantMemoriesText += `- 程序记忆(指令记忆): ${memoryGroups['指令记忆'].length} 条\n`;
+        // Add memory type statistics
+        importantMemoriesText += "\n\n## Memory Type Statistics\n";
+        importantMemoriesText += `- Semantic Memory (Factual Memory): ${memoryGroups['Factual Memory'].length} items\n`;
+        importantMemoriesText += `- Episodic Memory (Perceptual Memory): ${memoryGroups['Perceptual Memory'].length} items\n`;
+        importantMemoriesText += `- Procedural Memory (Instructional Memory): ${memoryGroups['Instructional Memory'].length} items\n`;
         
-        // 为了兼容，同时尝试获取完整记忆对象
+        // For compatibility, also try to retrieve complete memory objects
         try {
           const fullMemory = await mem0Service.search('*', {
             user_id: childID,
@@ -514,14 +514,14 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
           if (fullMemory.length > 0 && fullMemory[0].metadata && fullMemory[0].metadata.important_info) {
             const importantInfo = fullMemory[0].metadata.important_info;
             
-            // 如果三维分类不完整，回退到传统字段，确保不丢失信息
+            // Fallback to traditional fields if 3D classification is incomplete, ensuring no information loss
             let hasTraditionalFields = false;
             
             if (importantInfo.name || 
                 (importantInfo.familyMembers && importantInfo.familyMembers.length > 0) ||
                 (importantInfo.friends && importantInfo.friends.length > 0)) {
                 
-                importantMemoriesText += "\n\n## 基本信息补充\n";
+                importantMemoriesText += "\n\n## Basic Information Supplement\n";
                 hasTraditionalFields = true;
                 
                 if (importantInfo.name) {
@@ -537,14 +537,14 @@ app.post("/api/agent/generate-prompt", async (req, res) => {
                 }
             }
             
-            // 添加原始记忆内容作为参考
+            // Add original memory content as reference
             if (fullMemory[0].content) {
-              importantMemoriesText += "\n\n## 原始记忆参考\n";
+              importantMemoriesText += "\n\n## Original Memory Reference\n";
               importantMemoriesText += `${fullMemory[0].content.substring(0, 500)}${fullMemory[0].content.length > 500 ? '...' : ''}`;
             }
           }
         } catch (legacyError) {
-          console.warn("获取传统记忆格式时出错:", legacyError);
+          console.warn("Error retrieving traditional memory format:", legacyError);
         }
         
         systemPrompt += importantMemoriesText;
