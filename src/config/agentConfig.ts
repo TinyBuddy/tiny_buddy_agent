@@ -224,7 +224,7 @@ export const getFullSystemPrompt = (childProfile: any): string => {
 
 
   return currentSystemPromptTemplate
-		.replace("{{childName}}", childProfile.id)
+		.replace("{{childName}}", childProfile.name || childProfile.id)
 		.replace("{{childAge}}", childProfile.age.toString())
 		.replace("{{gender}}", childProfile.gender || "other")
 		.replace("{{childInterests}}", childProfile.interests.join(", "))
