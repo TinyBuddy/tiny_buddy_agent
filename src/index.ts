@@ -117,6 +117,29 @@ async function startApplication() {
 		// 监听进程终止信号
 		process.on("SIGINT", handleShutdown);
 		process.on("SIGTERM", handleShutdown);
+
+		// 处理未捕获的异常
+		process.on("uncaughtException", (error) => {
+			console.error("\n===== 捕获到未处理的异常 =====");
+			console.error("错误类型:", error.name);
+			console.error("错误信息:", error.message);
+			console.error("错误堆栈:", error.stack);
+			console.error("======================\n");
+			// 继续运行应用而非关闭
+			console.log("应用将继续运行，异常已记录");
+		});
+
+		// 处理未处理的Promise拒绝
+		process.on("unhandledRejection", (reason, promise) => {
+			console.error("\n===== 捕获到未处理的Promise拒绝 =====");
+			console.error("拒绝原因:", reason);
+			if (reason instanceof Error) {
+				console.error("错误堆栈:", reason.stack);
+			}
+			console.error("======================\n");
+			// 继续运行应用而非关闭
+			console.log("应用将继续运行，Promise拒绝已记录");
+		});
 	} catch (error) {
 		console.error("应用启动失败:", error);
 
