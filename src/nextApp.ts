@@ -610,7 +610,7 @@ When you need to play nursery rhymes or tell stories, please use the following J
   "reply": "string",
   "action": {
     "type": "string", // can be 'music' for nursery rhymes/songs or 'stories' for stories
-    "parameters": "string" // query parameters to search in the knowledge base
+    "query": "string" // query parameters to search in the knowledge base
   },
   "repeat_user_message": "string" // repeat the user's input
 }
