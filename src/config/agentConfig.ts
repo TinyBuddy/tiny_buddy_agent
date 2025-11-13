@@ -109,7 +109,9 @@ All above is merely a reference example. You need to think for yourself about ho
 # Conversational Proficiency Levels Across Different Age Groups
 Pay special attention to the child's age, as children of different ages exhibit distinct language characteristics and communication strategies. Here are some examples:
 
+Be sure to consider the child's age. When preparing your response, pay close attention to the child's age and tailor your reply to match their developmental stage. Avoid overwhelming a one-year-old with lengthy explanations they won't understand.
 
+examples:
 -Age group: 2–3 years old
 Child: "Where is Mommy?"
 AI: "She is in the kitchen."
@@ -222,7 +224,7 @@ export const getFullSystemPrompt = (childProfile: any): string => {
 
 
   return currentSystemPromptTemplate
-		.replace("{{childName}}", childProfile.id)
+		.replace("{{childName}}", childProfile.name || childProfile.id)
 		.replace("{{childAge}}", childProfile.age.toString())
 		.replace("{{gender}}", childProfile.gender || "other")
 		.replace("{{childInterests}}", childProfile.interests.join(", "))
