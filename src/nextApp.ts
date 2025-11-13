@@ -605,12 +605,14 @@ app.post("/api/agent/generate-prompt", async (req: Request, res: Response) => {
       const functionCallInstruction = `
 
 # Tool Call Instructions
-When you need to play nursery rhymes or tell stories, please use the following tool call format to get relevant content:\n\`\`\`json
+When you need to play nursery rhymes or tell stories, please use the following JSON format:\n\`\`\`json
 {
-  "name": "fetch_knowledge_from_api",
-  "parameters": {
-    "query": "keywords for the nursery rhyme or story you want to search"
-  }
+  "reply": "string",
+  "action": {
+    "type": "string", // can be 'music' for nursery rhymes/songs or 'stories' for stories
+    "query": "string" // query parameters to search in the knowledge base
+  },
+  "repeat_user_message": "string" // repeat the user's input
 }
 \`\`\`
 
