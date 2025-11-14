@@ -609,12 +609,18 @@ When you need to play nursery rhymes or tell stories, please use the following J
 {
   "reply": "string",
   "action": {
-    "type": "string", // can be 'music' for nursery rhymes/songs or 'stories' for stories
-    "query": "string" // query parameters to search in the knowledge base
+    "type": "fetch_from_knowledge_base",
+    "query": "string"
   },
-  "repeat_user_message": "string" // repeat the user's input
+  "repeat_user_message": "string"
 }
 \`\`\`
+
+Important Notes:
+- The JSON response must be in standard format without any comments
+- The "type" field must be exactly "fetch_from_knowledge_base"
+- Ensure the JSON is properly formatted with correct escaping
+- Do not include any additional text outside the JSON code block
 
 Applicable scenarios:
 - When the child requests nursery rhymes, music, or wants to hear a story
