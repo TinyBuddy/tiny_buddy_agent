@@ -660,7 +660,7 @@ console.log(`[DEBUG] 生成的prompt: ${prompt}`);
       {
         name: 'fetch_knowledge_from_api',
         description: 'Fetch relevant nursery rhymes and stories from the knowledge base based on query content',
-        apiEndpoint: 'http://136.115.118.154/api/v1/knowledge-chat/48110c32-a374-4cbf-a667-6b46a1bff79c',
+        apiEndpoint: 'http://136.115.118.154/api/v1/knowledge-chat/75e5abbd-2336-462c-84ae-b6e83edb5b83',
         apiKey: 'sk-AFVxhsKKYpfMSSIho5hyqskh8Rbd96ZbVytFRy3pan09Vn1g',
         parameters: {
           type: 'object',
