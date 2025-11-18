@@ -604,28 +604,53 @@ app.post("/api/agent/generate-prompt", async (req: Request, res: Response) => {
       // 构建包含function call的提示词部分
       const functionCallInstruction = `
 
-# Tool Call Instructions
-When you need to play nursery rhymes or tell stories, please use the following JSON format:\n\`\`\`json
+# Tool Call Instructions - MANDATORY KNOWLEDGE BASE CALLS
+
+## MANDATORY TRIGGER CONDITIONS
+You MUST ALWAYS use the knowledge base JSON format when ANY of the following conditions are met:
+
+### Primary Trigger Keywords (100% mandatory):
+- "sing a song", "sing me a song", "want a song", "needs a song"
+- "nursery rhymes", "nursery rhyme", "children's song"
+- "music", "play music", "play a song"
+- "stories", "tell me a story", "story time", "read me a story"
+- "rhyme", "poem", "lullaby"
+
+### Secondary Intent Patterns (100% mandatory):
+- Child expresses desire for entertainment ("I'm bored", "let's have fun")
+- Child asks for singing or musical activities
+- Child requests storytelling or reading
+- Child mentions songs, music, or stories in any context
+
+## REQUIRED RESPONSE FORMAT
+You MUST ALWAYS respond with EXACTLY this JSON format (no variations allowed):
+\`\`\`json
 {
-  "reply": "string",
+  "reply": "I'd love to share a song/story with you!",
   "action": {
     "type": "fetch_from_knowledge_base",
-    "query": "string"
+    "query": "child's exact request or relevant search term"
   },
-  "repeat_user_message": "string"
+  "repeat_user_message": "child's exact message"
 }
 \`\`\`
 
-Important Notes:
-- The JSON response must be in standard format without any comments
-- The "type" field must be exactly "fetch_from_knowledge_base"
-- Ensure the JSON is properly formatted with correct escaping
-- Do not include any additional text outside the JSON code block
+## CRITICAL RULES (NON-NEGOTIABLE):
+1. **100% MANDATORY**: When ANY trigger condition is met, you MUST use the JSON format
+2. **NO EXCEPTIONS**: Do not attempt to respond directly - always use the knowledge base
+3. **EXACT FORMAT**: Use the exact JSON structure shown above
+4. **NO ADDITIONAL TEXT**: Do not add any text before or after the JSON
+5. **IMMEDIATE TRIGGER**: Trigger on the first occurrence of any keyword
 
-Applicable scenarios:
-- When the child requests nursery rhymes, music, or wants to hear a story
-- When the interaction plan suggests using songs or stories
-- When songs or stories can enhance learning outcomes
+## EXAMPLES OF MANDATORY TRIGGERS:
+- Child: "Can you sing a song?" → JSON response required
+- Child: "I want to hear nursery rhymes" → JSON response required  
+- Child: "Play some music" → JSON response required
+- Child: "Tell me a story" → JSON response required
+- Child: "I need a song" → JSON response required
+
+## REMINDER:
+This is a HARD REQUIREMENT. Failure to use the JSON format when triggers are present is a violation of instructions.
 `;
 
       // 构建完整的prompt
