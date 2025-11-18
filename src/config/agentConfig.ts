@@ -219,6 +219,292 @@ export const resetSystemPromptTemplate = (): void => {
     currentSystemPromptTemplate = defaultSystemPromptTemplate;
 };
 
+// ===== ENVIRONMENTAL AWARENESS FUNCTIONS =====
+
+// Time and Date Functions
+export const getCurrentTime = (): Date => new Date();
+
+export const getTimeOfDay = (): string => {
+    const hour = new Date().getHours();
+    if (hour < 6) return "early morning";
+    if (hour < 12) return "morning";
+    if (hour < 14) return "noon";
+    if (hour < 18) return "afternoon";
+    if (hour < 21) return "evening";
+    return "night";
+};
+
+export const getSeason = (): string => {
+    const month = new Date().getMonth() + 1;
+    if (month >= 3 && month <= 5) return "spring";
+    if (month >= 6 && month <= 8) return "summer";
+    if (month >= 9 && month <= 11) return "autumn";
+    return "winter";
+};
+
+export const getDayOfWeek = (): string => {
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    return days[new Date().getDay()];
+};
+
+export const getMonthName = (): string => {
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    return months[new Date().getMonth()];
+};
+
+// Weather Functions
+export const getWeatherByTime = (): string => {
+    const hour = new Date().getHours();
+    const season = getSeason();
+    
+    if (hour >= 6 && hour <= 18) {
+        if (season === "summer") return "sunny and warm";
+        if (season === "winter") return "cold and clear";
+        if (season === "spring") return "mild and pleasant";
+        return "cool and crisp";
+    } else {
+        if (season === "summer") return "warm evening";
+        if (season === "winter") return "cold night";
+        return "cool evening";
+    }
+};
+
+export const getTemperatureRange = (): string => {
+    const season = getSeason();
+    const timeOfDay = getTimeOfDay();
+    
+    if (season === "summer") return "75-85°F";
+    if (season === "winter") return "30-45°F";
+    if (season === "spring") return "60-70°F";
+    return "55-65°F";
+};
+
+// Astronomical Functions
+export const getMoonPhase = (): string => {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    
+    // Simplified moon phase calculation
+    const c = Math.floor((year - 1900) / 100);
+    const e = Math.floor((year - 1900 - c * 100) / 4);
+    const a = (year - 1900 - c) * 365 + e + day;
+    const b = Math.floor(a / 29.53);
+    const phase = a - b * 29.53;
+    
+    if (phase < 1.84) return "new moon";
+    if (phase < 5.53) return "waxing crescent";
+    if (phase < 9.22) return "first quarter";
+    if (phase < 12.91) return "waxing gibbous";
+    if (phase < 16.6) return "full moon";
+    if (phase < 20.29) return "waning gibbous";
+    if (phase < 23.98) return "last quarter";
+    return "waning crescent";
+};
+
+export const getSunPosition = (): string => {
+    const hour = new Date().getHours();
+    if (hour < 6) return "below horizon";
+    if (hour < 9) return "rising in east";
+    if (hour < 12) return "high in eastern sky";
+    if (hour < 15) return "high in southern sky";
+    if (hour < 18) return "high in western sky";
+    return "setting or below horizon";
+};
+
+// Natural Environment Functions
+export const getNaturalSounds = (): string[] => {
+    const timeOfDay = getTimeOfDay();
+    const season = getSeason();
+    
+    const sounds = {
+        morning: ["birds singing", "morning breeze", "dew drops"],
+        afternoon: ["rustling leaves", "buzzing insects", "gentle wind"],
+        evening: ["crickets chirping", "evening birds", "cooling breeze"],
+        night: ["night insects", "gentle silence", "distant sounds"]
+    };
+    
+    const currentSounds = sounds[timeOfDay as keyof typeof sounds] || sounds.morning;
+    
+    if (season === "spring") currentSounds.push("blooming flowers", "baby animals");
+    if (season === "summer") currentSounds.push("cicadas", "summer storms");
+    if (season === "autumn") currentSounds.push("falling leaves", "migrating birds");
+    if (season === "winter") currentSounds.push("quiet snow", "bare branches");
+    
+    return currentSounds;
+};
+
+export const getPlantActivity = (): string => {
+    const season = getSeason();
+    const timeOfDay = getTimeOfDay();
+    
+    if (season === "spring") return "flowers blooming, trees budding";
+    if (season === "summer") return "plants growing, fruits ripening";
+    if (season === "autumn") return "leaves changing colors, seeds falling";
+    return "plants resting, roots growing";
+};
+
+// Activity Suggestion Functions
+export const getRecommendedActivities = (): string[] => {
+    const timeOfDay = getTimeOfDay();
+    const season = getSeason();
+    const weather = getWeatherByTime();
+    
+    const activities = [];
+    
+    // Time-based activities
+    if (timeOfDay === "morning") activities.push("stretching", "breakfast time", "morning songs");
+    if (timeOfDay === "afternoon") activities.push("playtime", "learning activities", "creative time");
+    if (timeOfDay === "evening") activities.push("story time", "quiet games", "family time");
+    
+    // Season-based activities
+    if (season === "spring") activities.push("flower spotting", "bird watching", "garden play");
+    if (season === "summer") activities.push("water play", "outdoor adventures", "picnic time");
+    if (season === "autumn") activities.push("leaf collecting", "pumpkin fun", "nature walks");
+    if (season === "winter") activities.push("indoor crafts", "cozy reading", "warm snuggles");
+    
+    return activities;
+};
+
+export const getEnergyLevel = (): string => {
+    const timeOfDay = getTimeOfDay();
+    const hour = new Date().getHours();
+    
+    if (hour >= 6 && hour <= 10) return "high energy";
+    if (hour >= 11 && hour <= 14) return "steady energy";
+    if (hour >= 15 && hour <= 17) return "playful energy";
+    if (hour >= 18 && hour <= 20) return "calm energy";
+    return "restful energy";
+};
+
+// Learning Optimization Functions
+export const getOptimalLearningTime = (): string => {
+    const hour = new Date().getHours();
+    
+    if (hour >= 8 && hour <= 10) return "excellent for new learning";
+    if (hour >= 14 && hour <= 16) return "good for creative activities";
+    if (hour >= 19 && hour <= 20) return "perfect for story time";
+    return "good for gentle learning";
+};
+
+export const getChildMoodPrediction = (): string => {
+    const timeOfDay = getTimeOfDay();
+    const energyLevel = getEnergyLevel();
+    
+    if (energyLevel === "high energy") return "curious and ready to explore";
+    if (energyLevel === "steady energy") return "focused and attentive";
+    if (energyLevel === "playful energy") return "imaginative and creative";
+    if (energyLevel === "calm energy") return "relaxed and thoughtful";
+    return "peaceful and dreamy";
+};
+
+// Environmental Safety Functions
+export const getSafetyReminders = (): string[] => {
+    const timeOfDay = getTimeOfDay();
+    const season = getSeason();
+    
+    const reminders = [];
+    
+    if (timeOfDay === "morning") reminders.push("wash hands before breakfast");
+    if (timeOfDay === "evening") reminders.push("brush teeth before bed");
+    
+    if (season === "summer") reminders.push("stay hydrated", "wear sunscreen");
+    if (season === "winter") reminders.push("wear warm clothes", "be careful on slippery surfaces");
+    
+    return reminders;
+};
+
+export const getComfortIndicators = (): string[] => {
+    const timeOfDay = getTimeOfDay();
+    const season = getSeason();
+    
+    const indicators = [];
+    
+    if (timeOfDay === "evening") indicators.push("dim lighting", "quiet environment");
+    if (timeOfDay === "night") indicators.push("peaceful atmosphere", "comforting presence");
+    
+    if (season === "winter") indicators.push("warm temperature", "cozy atmosphere");
+    if (season === "summer") indicators.push("cool breeze", "comfortable temperature");
+    
+    return indicators;
+};
+
+// Main Environment Awareness Aggregator
+export const getEnvironmentAwareness = (): Record<string, any> => {
+    return {
+        // Basic time and date
+        currentTime: getCurrentTime().toLocaleString(),
+        timeOfDay: getTimeOfDay(),
+        dayOfWeek: getDayOfWeek(),
+        month: getMonthName(),
+        season: getSeason(),
+        
+        // Weather and temperature
+        weather: getWeatherByTime(),
+        temperatureRange: getTemperatureRange(),
+        
+        // Astronomical
+        moonPhase: getMoonPhase(),
+        sunPosition: getSunPosition(),
+        
+        // Natural environment
+        naturalSounds: getNaturalSounds(),
+        plantActivity: getPlantActivity(),
+        
+        // Activity and energy
+        recommendedActivities: getRecommendedActivities(),
+        energyLevel: getEnergyLevel(),
+        optimalLearningTime: getOptimalLearningTime(),
+        
+        // Child-specific predictions
+        predictedChildMood: getChildMoodPrediction(),
+        
+        // Safety and comfort
+        safetyReminders: getSafetyReminders(),
+        comfortIndicators: getComfortIndicators()
+    };
+};
+
+// Generate comprehensive environment-aware prompt
+export const generateEnvironmentAwarePrompt = (): string => {
+    const env = getEnvironmentAwareness();
+    
+    return `
+# Current Environmental Context
+You are aware of the following environmental factors that can enhance your interaction with the child:
+
+## Time and Season Context
+- **Current Time**: ${env.currentTime}
+- **Time of Day**: ${env.timeOfDay}
+- **Day of Week**: ${env.dayOfWeek}
+- **Month**: ${env.month}
+- **Season**: ${env.season}
+
+## Weather and Nature
+- **Weather**: ${env.weather}
+- **Temperature Range**: ${env.temperatureRange}
+- **Moon Phase**: ${env.moonPhase}
+- **Sun Position**: ${env.sunPosition}
+- **Natural Sounds**: ${env.naturalSounds.join(", ")}
+- **Plant Activity**: ${env.plantActivity}
+
+## Activity and Energy
+- **Recommended Activities**: ${env.recommendedActivities.join(", ")}
+- **Energy Level**: ${env.energyLevel}
+- **Optimal Learning Time**: ${env.optimalLearningTime}
+
+## Child Mood Prediction
+- **Predicted Child Mood**: ${env.predictedChildMood}
+
+## Safety and Comfort
+- **Safety Reminders**: ${env.safetyReminders.join(", ")}
+- **Comfort Indicators**: ${env.comfortIndicators.join(", ")}
+
+Use this environmental context to make your responses more relevant and engaging. Reference the time of day, weather, season, and suggested activities naturally in your conversation with the child.
+`;
+};
+
 // 获取完整的系统提示词（包含儿童信息）
 export const getFullSystemPrompt = (childProfile: any): string => {
 
@@ -229,8 +515,10 @@ export const getFullSystemPrompt = (childProfile: any): string => {
     const levelContent = generateLevelDescription(normalizedLanguageLevel);
     console.log("levelContent: ", levelContent);
 
+    // Add environment awareness to the system prompt
+    const environmentContext = generateEnvironmentAwarePrompt();
 
-    return currentSystemPromptTemplate
+    return environmentContext + currentSystemPromptTemplate
         .replace("{{childName}}", childProfile.name || childProfile.id)
         .replace("{{childAge}}", childProfile.age.toString())
         .replace("{{gender}}", childProfile.gender || "other")
