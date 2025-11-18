@@ -626,7 +626,7 @@ You MUST ALWAYS use the knowledge base JSON format when ANY of the following con
 You MUST ALWAYS respond with EXACTLY this JSON format (no variations allowed):
 \`\`\`json
 {
-  "reply": "I'd love to share a song/story with you!",
+  "reply": "LLM's reply based on child's requests",
   "action": {
     "type": "fetch_from_knowledge_base",
     "query": "child's exact request or relevant search term"
