@@ -2,7 +2,7 @@ import { config } from "dotenv";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { eq } from "drizzle-orm";
 import { Pool } from "pg";
-import { childProfiles } from "./schema";
+import { childProfiles, chineseLearningProgress } from "./schema";
 
 // 加载环境变量
 config();
@@ -127,6 +127,56 @@ export async function listChildProfiles() {
 		return result;
 	} catch (error) {
 		console.error("Error listing child profiles", error);
+		throw error;
+	}
+}
+
+// 中文学习进度相关操作
+
+// 获取儿童的中文学习进度
+export async function getChineseLearningProgress(childId: string) {
+	try {
+		const result = await db.select().from(chineseLearningProgress).where(eq(chineseLearningProgress.childId, childId));
+		return result.length > 0 ? result[0] : null;
+	} catch (error) {
+		console.error(`Error getting chinese learning progress for child ${childId}`, error);
+		throw error;
+	}
+}
+
+// 创建或更新儿童的中文学习进度
+export async function upsertChineseLearningProgress(childId: string, progressData: Partial<typeof chineseLearningProgress.$inferInsert>) {
+	try {
+		const existing = await getChineseLearningProgress(childId);
+		
+		if (existing) {
+			// 更新现有记录
+			const result = await db
+				.update(chineseLearningProgress)
+				.set({
+					...progressData,
+					updatedAt: new Date(),
+				})
+				.where(eq(chineseLearningProgress.childId, childId))
+				.returning();
+			return result[0];
+		} else {
+			// 创建新记录
+			const result = await db
+				.insert(chineseLearningProgress)
+				.values({
+					childId,
+					sparkyTaughtWords: progressData.sparkyTaughtWords || {},
+					taughtCount: progressData.taughtCount || {},
+					childSpokenWords: progressData.childSpokenWords || {},
+					wordLearnCount: progressData.wordLearnCount || {},
+					nextLearningSuggestion: progressData.nextLearningSuggestion || '',
+				})
+				.returning();
+			return result[0];
+		}
+	} catch (error) {
+		console.error(`Error upserting chinese learning progress for child ${childId}`, error);
 		throw error;
 	}
 }

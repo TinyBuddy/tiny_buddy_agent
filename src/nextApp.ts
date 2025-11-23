@@ -14,6 +14,8 @@ import { createDefaultChildProfile } from "./models/childProfile";
 import { createMessage } from "./models/message";
 import { getFullSystemPrompt } from "./config/agentConfig";
 import { mem0Service } from "./services/mem0Service";
+import { chatHistoryQueue } from "./services/chatHistoryQueue";
+import { processChineseVocabulary } from "./services/chineseVocabularyWorker";
 
 // 创建Express应用（集成Next.js功能）
 const app = express();
@@ -216,6 +218,18 @@ app.post("/api/agent/generate-prompt", async (req: Request, res: Response) => {
     console.log("req param is ", req.body)
     console.log(`[API_PERF] 参数解析与验证耗时: ${Date.now() - parseStart}ms`);
     console.log("params languageLevel is ", languageLevel)
+    
+    // 异步推送 chatHistory 到队列（不阻塞主请求）
+    chatHistoryQueue.enqueue({
+      childId: childID,
+      childName,
+      childAge,
+      languageLevel,
+      historyMsgs,
+      timestamp: Date.now(),
+    }).catch(err => {
+      console.error('[API] 推送消息到队列失败:', err);
+    });
     
     // 生成缓存键
     const lastChildMsg = historyMsgs.length > 0 ? historyMsgs[historyMsgs.length - 1].child : "Hello";
@@ -586,6 +600,25 @@ app.post("/api/agent/generate-prompt", async (req: Request, res: Response) => {
       // 继续执行，不中断流程
     }
 
+      // 获取中文学习建议并添加到提示词
+      try {
+        const { getChineseLearningProgress } = await import('./db/db');
+        const learningProgress = await getChineseLearningProgress(childID);
+        
+        if (learningProgress && learningProgress.nextLearningSuggestion) {
+          systemPrompt += `
+
+# Chinese Language Learning Guidance
+${learningProgress.nextLearningSuggestion}
+
+`;
+          console.log(`[API] 已添加中文学习建议到提示词中`);
+        }
+      } catch (error) {
+        console.error('[API] 获取中文学习建议失败:', error);
+        // 继续执行，不中断流程
+      }
+
       // 添加教学内容，整合strategy和teachingFocus
       systemPrompt += `
 
@@ -749,6 +782,10 @@ console.log(`[DEBUG] 生成的prompt: ${prompt}`);
  * 启动HTTP服务器
  */
 export const startHttpServer = async () => {
+	// 注册中文词汇分析 Worker 到队列
+	chatHistoryQueue.registerConsumer(processChineseVocabulary);
+	console.log('[startHttpServer] 已注册中文词汇分析 Worker');
+
 	// 使用不同的端口（3144）以避免与现有服务器冲突
 	const port = 3144;
 

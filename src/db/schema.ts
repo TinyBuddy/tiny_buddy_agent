@@ -39,6 +39,18 @@ export const vocabularyStats = pgTable("vocabulary_stats", {
 	lastUpdated: timestamp("last_updated").defaultNow().notNull(),
 });
 
+// 中文学习进度模型
+export const chineseLearningProgress = pgTable("chinese_learning_progress", {
+	childId: varchar("child_id", { length: 50 }).primaryKey(),
+	sparkyTaughtWords: jsonb("sparky_taught_words").notNull().default('{}'), // { "word": count }
+	taughtCount: jsonb("taught_count").notNull().default('{}'), // { "word": count }
+	childSpokenWords: jsonb("child_spoken_words").notNull().default('{}'), // { "word": count }
+	wordLearnCount: jsonb("word_learn_count").notNull().default('{}'), // { "word": { "learned": count, "reviewed": count, "mastered": boolean } }
+	nextLearningSuggestion: text("next_learning_suggestion").default(''),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // 导出类型
 export type ChildProfile = typeof childProfiles.$inferSelect;
 export type NewChildProfile = typeof childProfiles.$inferInsert;
@@ -46,3 +58,5 @@ export type Vocabulary = typeof vocabulary.$inferSelect;
 export type NewVocabulary = typeof vocabulary.$inferInsert;
 export type VocabularyStats = typeof vocabularyStats.$inferSelect;
 export type NewVocabularyStats = typeof vocabularyStats.$inferInsert;
+export type ChineseLearningProgress = typeof chineseLearningProgress.$inferSelect;
+export type NewChineseLearningProgress = typeof chineseLearningProgress.$inferInsert;
