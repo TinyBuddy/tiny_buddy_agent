@@ -525,7 +525,8 @@ export const getFullSystemPrompt = (childProfile: any): string => {
     const city = childProfile.city || childProfile.location || "New York";
     
     // Add environment awareness to the system prompt with city information
-    const environmentContext = generateEnvironmentAwarePrompt(city);
+    // const environmentContext = generateEnvironmentAwarePrompt(city);
+    const environmentContext = "    ";
 
     return environmentContext + currentSystemPromptTemplate
         .replace("{{childName}}", childProfile.name || childProfile.id)
