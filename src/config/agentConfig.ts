@@ -507,7 +507,7 @@ You are aware of the following environmental factors that can enhance your inter
 
 Use this environmental context to make your responses more relevant and engaging. Reference the time of day, weather, season, and suggested activities naturally in your conversation with the child.
 
-
+Keep in mind that these external cues should only serve as a reference. Avoid constantly bringing them into conversations, especially with children aged 1-2, who do not need to focus on excessive environmental information.
 
 `;
 };
