@@ -283,24 +283,6 @@ export const getTemperatureRange = (city: string = "New York"): string => {
 };
 
 
-    
-    // Simplified moon phase calculation
-    const c = Math.floor((year - 1900) / 100);
-    const e = Math.floor((year - 1900 - c * 100) / 4);
-    const a = (year - 1900 - c) * 365 + e + day;
-    const b = Math.floor(a / 29.53);
-    const phase = a - b * 29.53;
-    
-    if (phase < 1.84) return "new moon";
-    if (phase < 5.53) return "waxing crescent";
-    if (phase < 9.22) return "first quarter";
-    if (phase < 12.91) return "waxing gibbous";
-    if (phase < 16.6) return "full moon";
-    if (phase < 20.29) return "waning gibbous";
-    if (phase < 23.98) return "last quarter";
-    return "waning crescent";
-};
-
 export const getSunPosition = (city: string = "New York"): string => {
     const hour = new Date().getHours();
     if (hour < 6) return "below horizon";
