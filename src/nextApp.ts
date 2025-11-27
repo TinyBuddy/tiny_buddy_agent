@@ -626,7 +626,7 @@ ${learningProgress.nextLearningSuggestion}
 `;
       
       // 添加教学策略
-      systemPrompt += `Teaching strategy: ${parsedPlanResult.strategy}\n`;
+      systemPrompt += `Conversation strategy: ${parsedPlanResult.strategy}\n`;
       
       // 添加教学重点（如果有）
       if (parsedPlanResult?.teachingFocus) {
