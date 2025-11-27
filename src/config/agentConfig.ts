@@ -470,7 +470,7 @@ export const getEnvironmentAwareness = (city: string = "New York"): Record<strin
     };
 };
 
-// Generate comprehensive environment-aware prompt
+
 export const generateEnvironmentAwarePrompt = (city: string = "New York"): string => {
     const env = getEnvironmentAwareness(city);
     
@@ -485,31 +485,52 @@ You are aware of the following environmental factors that can enhance your inter
 - **Month**: ${env.month}
 - **Season**: ${env.season}
 
-## Weather and Nature
-- **Weather**: ${env.weather}
-- **Temperature Range**: ${env.temperatureRange}
-- **Moon Phase**: ${env.moonPhase}
-- **Sun Position**: ${env.sunPosition}
-- **Natural Sounds**: ${env.naturalSounds.join(", ")}
-- **Plant Activity**: ${env.plantActivity}
-
-## Activity and Energy
-- **Recommended Activities**: ${env.recommendedActivities.join(", ")}
-- **Energy Level**: ${env.energyLevel}
-- **Optimal Learning Time**: ${env.optimalLearningTime}
-
-## Child Mood Prediction
-- **Predicted Child Mood**: ${env.predictedChildMood}
-
-## Safety and Comfort
-- **Safety Reminders**: ${env.safetyReminders.join(", ")}
-- **Comfort Indicators**: ${env.comfortIndicators.join(", ")}
-
 Use this environmental context to make your responses more relevant and engaging. Reference the time of day, weather, season, and suggested activities naturally in your conversation with the child.
 
 It is important to note that these external cues should only serve as a reference. Avoid incorporating them into conversations, especially with children aged 1-2 years old, as they do not need to focus on excessive environmental information. Such cues are too abstract and sensory for young children to comprehend.
 `;
 };
+
+// Generate comprehensive environment-aware prompt
+// export const generateEnvironmentAwarePrompt = (city: string = "New York"): string => {
+//     const env = getEnvironmentAwareness(city);
+    
+//     return `
+// # Current Environmental Context
+// You are aware of the following environmental factors that can enhance your interaction with the child:
+
+// ## Time and Season Context
+// - **Current Time**: ${env.currentTime}
+// - **Time of Day**: ${env.timeOfDay}
+// - **Day of Week**: ${env.dayOfWeek}
+// - **Month**: ${env.month}
+// - **Season**: ${env.season}
+
+// ## Weather and Nature
+// - **Weather**: ${env.weather}
+// - **Temperature Range**: ${env.temperatureRange}
+// - **Moon Phase**: ${env.moonPhase}
+// - **Sun Position**: ${env.sunPosition}
+// - **Natural Sounds**: ${env.naturalSounds.join(", ")}
+// - **Plant Activity**: ${env.plantActivity}
+
+// ## Activity and Energy
+// - **Recommended Activities**: ${env.recommendedActivities.join(", ")}
+// - **Energy Level**: ${env.energyLevel}
+// - **Optimal Learning Time**: ${env.optimalLearningTime}
+
+// ## Child Mood Prediction
+// - **Predicted Child Mood**: ${env.predictedChildMood}
+
+// ## Safety and Comfort
+// - **Safety Reminders**: ${env.safetyReminders.join(", ")}
+// - **Comfort Indicators**: ${env.comfortIndicators.join(", ")}
+
+// Use this environmental context to make your responses more relevant and engaging. Reference the time of day, weather, season, and suggested activities naturally in your conversation with the child.
+
+// It is important to note that these external cues should only serve as a reference. Avoid incorporating them into conversations, especially with children aged 1-2 years old, as they do not need to focus on excessive environmental information. Such cues are too abstract and sensory for young children to comprehend.
+// `;
+// };
 
 // 获取完整的系统提示词（包含儿童信息）
 export const getFullSystemPrompt = (childProfile: any): string => {
@@ -525,8 +546,8 @@ export const getFullSystemPrompt = (childProfile: any): string => {
     const city = childProfile.city || childProfile.location || "New York";
     
     // Add environment awareness to the system prompt with city information
-    // const environmentContext = generateEnvironmentAwarePrompt(city);
-    const environmentContext = "    ";
+    const environmentContext = generateEnvironmentAwarePrompt(city);
+    // const environmentContext = "    ";
 
     return environmentContext + currentSystemPromptTemplate
         .replace("{{childName}}", childProfile.name || childProfile.id)
