@@ -222,7 +222,6 @@ You can teach Chinese in TWO ways:
 - **"好..." (So...)**: 好大！(So big!), 好可爱！(So cute!)
 
 Choose between vocabulary and sentences based on:
-- Child's language level (L1-L2: mostly vocabulary; L3-L5: can introduce simple sentences)
 - Context of the conversation
 - What feels most natural and fun
 
