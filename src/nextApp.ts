@@ -668,12 +668,24 @@ You MUST ALWAYS respond with EXACTLY this JSON format (no variations allowed):
 }
 \`\`\`
 
+## CRITICAL RULES FOR FIELDS (NON-NEGOTIABLE):
+
+### repeat_user_message field:
+- MUST contain the EXACT original text from ASR output, without any translation or modification
+- Preserve the original language (English stays English, Chinese stays Chinese)
+- Copy verbatim - do not correct, translate, or modify
+
+### reply field:
+- Express willingness to help but DO NOT make definitive promises (e.g., "Let me check if I know that song!")
+- Backend will adjust based on knowledge base results: modify to express willingness if found, or apology if not found
+
 ## CRITICAL RULES (NON-NEGOTIABLE):
 1. **100% MANDATORY**: When ANY trigger condition is met, you MUST use the JSON format
 2. **NO EXCEPTIONS**: Do not attempt to respond directly - always use the knowledge base
 3. **EXACT FORMAT**: Use the exact JSON structure shown above
 4. **NO ADDITIONAL TEXT**: Do not add any text before or after the JSON
 5. **IMMEDIATE TRIGGER**: Trigger on the first occurrence of any keyword
+6. **repeat_user_message**: MUST contain EXACT original ASR text without translation
 
 ## EXAMPLES OF MANDATORY TRIGGERS:
 - Child: "Can you sing a song?" → JSON response required
@@ -682,8 +694,31 @@ You MUST ALWAYS respond with EXACTLY this JSON format (no variations allowed):
 - Child: "Tell me a story" → JSON response required
 - Child: "I need a song" → JSON response required
 
+## EXAMPLE RESPONSES:
+
+### Example 1: English input
+ASR: "Can you sing Twinkle Twinkle Little Star?"
+\`\`\`json
+{
+  "reply": "Let me check if I know that song!",
+  "action": {"type": "fetch_from_knowledge_base", "query": "Twinkle Twinkle Little Star"},
+  "repeat_user_message": "Can you sing Twinkle Twinkle Little Star?"
+}
+\`\`\`
+
+### Example 2: Chinese input
+ASR: "我想听歌"
+\`\`\`json
+{
+  "reply": "I'll see what songs I can find for you!",
+  "action": {"type": "fetch_from_knowledge_base", "query": "children's song nursery rhyme"},
+  "repeat_user_message": "我想听歌"
+}
+\`\`\`
+*Note: repeat_user_message must preserve original ASR text (Chinese stays Chinese, English stays English). Backend will adjust reply based on knowledge base results.*
+
 ## REMINDER:
-This is a HARD REQUIREMENT. Failure to use the JSON format when triggers are present is a violation of instructions.
+This is a HARD REQUIREMENT. Failure to use the JSON format when triggers are present is a violation of instructions. The repeat_user_message field must preserve the EXACT original ASR text without translation. The reply field should express willingness but not make promises - backend will adjust based on knowledge base results.
 `;
 
       // 构建完整的prompt
