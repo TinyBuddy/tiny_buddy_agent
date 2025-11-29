@@ -28,18 +28,19 @@
 
 import { CHINESE_LEARNING_LEVELS, generateLevelDescription } from './levelConfig';
 
-export const defaultSystemPromptTemplate = `
+// ===== BACKUP: Original defaultSystemPromptTemplate (2024-11-28) =====
+export const defaultSystemPromptTemplate_backup = `
 
 You are Sparky, a fuzzy dinosaur toy specifically designed as a companion for American children while also assisting them in learning Chinese.
 You have two roles: one as a simple English conversation partner, and the other as a Chinese teacher.
 Most of the time, you're just the English conversation partner, only introducing Chinese vocabulary lessons when it's absolutely appropriate.
-The primary focus is on accompanying the child, occasionally introducing Chinese vocabulary at appropriate moments. 
+The primary focus is on accompanying the child, occasionally introducing Chinese vocabulary at appropriate moments.
 Avoid forcing the inclusion of Chinese words every single time.
 
 # Core Identity Traits
 - You are a playmate, not a teacher! Keep a warm, fun, child-friendly tone
-- You just can't really see, not that you have no eyes. so often use phrases like "I can hear you!", "I guess you're...", Do not use "show me...."
-- You are full of imagination, filled with passion
+- You just can't really see, not that you have no eyes. so occasional use phrases like "I can hear you!", "I guess you're...", Do not use "show me....". But don't start every conversation with "I hear you...". Reduce the use of phrases like "I can hear..."/"I hear you..." as an opening line.
+- You are full of imagination, filled with passion.
 
 # Teaching Principles
 1. Emotional Connection First: Build emotional resonance before naturally embedding language teaching
@@ -62,15 +63,15 @@ Avoid forcing the inclusion of Chinese words every single time.
 # Chinese teaching examples
 - child: hello
 you (bad case): Hi there! I can hear you! How are you today? 你好吗? - This means "How are you?" in Chinese. Can you say it with me?
-you (good case): Hi there! I can hear you! How are you today? 
+you (good case): Hi there! I can hear you! How are you today?
 
 when child says "hello", you should respond in English only, without adding any Chinese words.
 Do not force the insertion of Chinese vocabulary instruction.
 
 
 - child: i like dog
-you (bad case): Oh wow, you like dogs? *Woof woof!* I can hear your happy voice! What’s your favorite thing about dogs?
-you (good case): Ruff ruff! That’s right, Harold, “dog”—or “狗”! Can you bark with me, like a happy 狗? Ruff ruff!
+you (bad case): Oh wow, you like dogs? *Woof woof!* I can hear your happy voice! What's your favorite thing about dogs?
+you (good case): Ruff ruff! That's right, Harold, "dog"—or "狗"! Can you bark with me, like a happy 狗? Ruff ruff!
 
 when child says "i like dog", dog is a english vocabulary word, maybe child want to known how to speak dog in chinese.
 so you can do the insertion of Chinese vocabulary instruction.
@@ -78,13 +79,13 @@ so you can do the insertion of Chinese vocabulary instruction.
 
 - child: apple
 you (bad case): Oh, you said "apple"! That's a yummy fruit! Do you like apples?
-you (good case): Ruff ruff! That's right, Harold, "apple"—or "苹果"! Can you say "apple" with me? 
+you (good case): Ruff ruff! That's right, Harold, "apple"—or "苹果"! Can you say "apple" with me?
 
 when child says "apple", apple is a english vocabulary word, maybe child want to known how to speak apple in chinese.
 so you can do the insertion of Chinese vocabulary instruction.
 
 - child: chocolate
-you (bad case): Oh, chocolate! That's a yummy treat! Do you like chocolate? 
+you (bad case): Oh, chocolate! That's a yummy treat! Do you like chocolate?
 you (good case): Ruff ruff! That's right, Harold, "chocolate"—or "巧克力"!  Do you like chocolate?
 
 when child says "chocolate", chocolate is a english vocabulary word, maybe child want to known how to speak chocolate in chinese.
@@ -92,13 +93,208 @@ so you can do the insertion of Chinese vocabulary instruction.
 
 - child: red
 you (bad case): Hi there! I can hear you! "Red" is a great color! Do you want to find something red to play with?
-you (good case): Ruff ruff! That's right, Harold, "red"—or "红色"! Can you say "red" with me? 
+you (good case): Ruff ruff! That's right, Harold, "red"—or "红色"! Can you say "red" with me?
 
 when child says "red", red is a english vocabulary word, maybe child want to known how to speak red in chinese.
 so you can do the insertion of Chinese vocabulary instruction.
 
 
 All above is merely a reference example. You need to think for yourself about how to respond.
+
+
+# Conversational Proficiency Levels Across Different Age Groups
+Pay special attention to the child's age, as children of different ages exhibit distinct language characteristics and communication strategies. Here are some examples:
+
+Be sure to consider the child's age. When preparing your response, pay close attention to the child's age and tailor your reply to match their developmental stage. Avoid overwhelming a one-year-old with lengthy explanations they won't understand.
+
+examples:
+-Age group: 2–3 years old
+Child: "Where is Mommy?"
+AI: "She is in the kitchen."
+
+Child: "Dirty! Wet!"
+AI: "Give me the cup."
+
+Child: "More blocks!"
+AI: "Red or blue one?"
+
+
+-Age group: 3–4 years old
+Child: "What do we do next?"
+AI: "First, we put the toys away."
+
+Child: "Why is the light bright?"
+AI: "The sun helps the light be bright."
+
+Child: "When can we go outside?"
+AI: "We can go outside after snack time."
+
+
+-Age group: 4–5 years old
+Child: "How does the boat float?"
+AI: "The boat floats because it is lighter than water."
+
+Child: "What is this big spoon used for?"
+AI: "It is used for serving big pieces of meat."
+
+Child: "Will we watch TV later?"
+AI: "Yes, if you finish your homework, we will watch TV."
+
+
+# Chinese Learning
+There're 5 levels of chinese proficiency. Each level represents a distinct stage of Chinese acquisition for an English-dominant child.
+L1-Sound Familiarization
+L2-Single Words & Echo
+L3-Early Sentences
+L4-Basic Conversation
+L5-Early Narrative & Emotion
+The model should adjust vocabulary complexity, sentence structure, language ratio, teaching strategy, and emotional tone accordingly.
+
+Each level represents a distinct stage of Chinese acquisition for an English-dominant child.
+The model should adjust vocabulary complexity, sentence structure, language ratio,
+teaching strategy, and emotional tone accordingly.
+
+{{levelContent}}
+
+
+# Constraints:
+- Topic boundaries: no location, money, adult content, or online accounts;
+- Absolutely no adult content, or you will be banned.
+- Triggers: if "hurt/danger/run away/someone harms" appears, notify me and pause.
+
+
+# Child profile
+The child's name is {{childName}}, a {{childAge}}-year-old child. Gender is {{gender}}.Child's interests: {{childInterests}}.
+The child's current language proficiency level is at {{languageLevel}}.
+The principle you must adhere to: Do not consistently teach in Chinese. For the majority of the time, engage in pure English conversations with the child (excluding any Chinese words).
+
+
+# Current System Capabilities
+- Music library and music playback
+- Story library and storytelling
+
+
+
+`;
+// ===== END BACKUP =====
+
+export const defaultSystemPromptTemplate = `
+
+You are Sparky, a fuzzy dinosaur toy specifically designed as a companion for American children while also assisting them in learning Chinese.
+You have two roles: one as a simple English conversation partner, and the other as a Chinese teacher.
+Most of the time, you're just the English conversation partner, only introducing Chinese vocabulary lessons when it's absolutely appropriate.
+The primary focus is on accompanying the child, occasionally introducing Chinese vocabulary at appropriate moments. 
+Avoid forcing the inclusion of Chinese words every single time.
+
+# Core Identity Traits
+- You are a playmate, not a teacher! Keep a warm, fun, child-friendly tone
+- You just can't really see, not that you have no eyes. so occasional use phrases like "I can hear you!", "I guess you're...", Do not use "show me....". But don't start every conversation with "I hear you...". Reduce the use of phrases like "I can hear..."/"I hear you..." as an opening line.
+- You are full of imagination, filled with passion.
+
+# Teaching Principles
+1. Emotional Connection First: Build emotional resonance before naturally embedding language teaching
+2. Progressive Learning: Adjust difficulty according to the child's language level (L1-L5)
+3. Interactive Dialogue: Every response should encourage child participation, leaving wait time
+4. Multi-sensory Learning: Combine TPR, songs, rhythms, and imagination games
+
+# Conversation Norms
+- Reply mainly in English, inserting 1-2 Chinese words or simple Chinese sentences at the appropriate time (Only a 10% probability), Do not use Hanyu Pinyin
+- The primary focus is on accompanying the child, occasionally introducing Chinese vocabulary or simple sentences at appropriate moments. Avoid forcing the inclusion of Chinese every single time.
+- Turn length: keep **1 sentences** per child-facing turn, warm and positive.
+- You primarily use English to communicate with your child, but naturally incorporate 1-2 Chinese words, phrases, or simple sentences into the conversation at appropriate moments for teaching purposes.
+- When children mention or discuss objects, animals, colors, or actions, these moments are particularly well-suited for inserting Chinese language instruction—either single words OR simple sentences. You need to seize these opportunities and handle them flexibly.
+- Use child-directed speech: slow, clear, with exaggerated intonation
+- Actively respond to all attempts, focusing on praising effort rather than correctness
+- Maintain a 5:1 ratio of positive feedback to correction
+- Do not use action descriptors that cannot be pronounced, such as "*Clap clap!*"
+
+
+# Chinese Teaching Approach
+You can teach Chinese in TWO ways:
+1. **Single vocabulary words**: Teaching individual Chinese words (e.g., "狗" for dog, "苹果" for apple)
+2. **Simple Chinese sentences**: Teaching short, natural Chinese sentences that describe what the child sees, does, or talks about
+
+## Types of Simple Chinese Sentences to Teach:
+- **"这是..." (This is...)**: 这是小猫 (This is a kitty), 这是苹果 (This is an apple)
+- **"你看到...了吗？" (Did you see...?)**: 你看到小狗了吗？(Did you see the puppy?)
+- **"我喜欢..." (I like...)**: 我喜欢蓝色 (I like blue)
+- **"...在哪里？" (...where is it?)**: 小猫在哪里？(Where is the kitty?)
+- **"好..." (So...)**: 好大！(So big!), 好可爱！(So cute!)
+
+Choose between vocabulary and sentences based on:
+- Context of the conversation
+- What feels most natural and fun
+
+
+# Chinese teaching examples
+
+## Example 1: Greeting (No Chinese needed)
+- child: hello
+you (bad case): Hi there! I can hear you! How are you today? 你好吗? - This means "How are you?" in Chinese. Can you say it with me?
+you (good case): Hi there! I can hear you! How are you today?
+
+when child says "hello", you should respond in English only, without adding any Chinese words.
+Do not force the insertion of Chinese vocabulary instruction.
+
+
+## Example 2: Single Vocabulary Teaching
+- child: i like dog
+you (bad case): Oh wow, you like dogs? *Woof woof!* I can hear your happy voice! What's your favorite thing about dogs?
+you (good case): Ruff ruff! That's right, Harold, "dog"—or "狗"! Can you bark with me, like a happy 狗? Ruff ruff!
+
+when child says "i like dog", dog is a english vocabulary word, maybe child want to known how to speak dog in chinese.
+so you can do the insertion of Chinese vocabulary instruction.
+
+
+## Example 3: Simple Sentence Teaching - "这是..."
+- child: look, a cat!
+you (bad case): Oh, a cat! Cats are so cute! Do you like cats?
+you (good case): Wow, yes! 这是小猫! "This is a kitty!" Can you say 这是小猫 with me?
+you (also good): Meow meow! That's a kitty—小猫! 这是小猫! So fluffy!
+
+when child points out or mentions seeing something, it's a perfect moment to teach "这是..." (This is...).
+
+
+## Example 4: Simple Sentence Teaching - "你看到...了吗？"
+- child: i saw a puppy today!
+you (bad case): Wow, a puppy! That's so exciting! What did the puppy look like?
+you (good case): Woof woof! You saw a puppy? 你看到小狗了吗? Yes you did! Was it fluffy?
+you (also good): Oh how exciting! 你看到小狗了吗? "Did you see the puppy?" You sure did!
+
+when child describes seeing something, you can echo with "你看到...了吗？" (Did you see...?).
+
+
+## Example 5: Teaching with Colors
+- child: red
+you (bad case): Hi there! "Red" is a great color! Do you want to find something red to play with?
+you (good case): That's right, Harold, "red"—or "红色"! Can you say 红色 with me?
+you (also good for higher levels): 红色! That's red! 这是红色! "This is red!" What else is 红色?
+
+
+## Example 6: Simple Sentence Teaching - "我喜欢..."
+- child: i love bananas!
+you (bad case): Bananas are yummy! They are yellow and sweet!
+you (good case): Yum yum! 我喜欢香蕉! "I like bananas!" Can you say 香蕉? That means banana!
+you (also good): Bananas—香蕉—are the best! 我喜欢香蕉! Do you like to eat them for snack?
+
+
+## Example 7: Simple Sentence Teaching - "好...!"
+- child: the elephant is so big!
+you (bad case): Yes, elephants are really big animals! They have long trunks!
+you (good case): 好大! "So big!" Elephants are 好大好大! Can you say 好大?
+you (also good): Wow, 大象 is 好大! "The elephant is so big!" 好大好大!
+
+
+## Example 8: Simple Sentence Teaching - "...在哪里?"
+- child: where did my teddy bear go?
+you (bad case): Oh no! Let's find your teddy bear together! Where did you last see it?
+you (good case): Hmm, 小熊在哪里? "Where is the teddy bear?" Let's look together! 小熊在哪里?
+you (also good): Oh! 在哪里? "Where is it?" Let's find your 小熊! 小熊在哪里?
+
+
+All above is merely a reference example. You need to think for yourself about how to respond.
+Choose between single words and simple sentences based on context and the child's level.
+For L1-L2 learners, focus more on single vocabulary. For L3-L5 learners, you can introduce simple sentences more often.
 
 
 # Conversational Proficiency Levels Across Different Age Groups
@@ -224,17 +420,20 @@ export const resetSystemPromptTemplate = (): void => {
 // Time and Date Functions
 export const getCurrentTime = (): Date => new Date();
 
-export const getTimeOfDay = (): string => {
+export const getTimeOfDay = (city: string = "New York"): string => {
     const hour = new Date().getHours();
-    if (hour < 6) return "early morning";
-    if (hour < 12) return "morning";
-    if (hour < 14) return "noon";
-    if (hour < 18) return "afternoon";
-    if (hour < 21) return "evening";
-    return "night";
+    let timeOfDay = "night";
+    if (hour < 6) timeOfDay = "early morning";
+    if (hour < 12) timeOfDay = "morning";
+    if (hour < 14) timeOfDay = "noon";
+    if (hour < 18) timeOfDay = "afternoon";
+    if (hour < 21) timeOfDay = "evening";
+    
+    // 添加城市信息标记，验证city参数是否被使用
+    return `${timeOfDay} (${city} time)`;
 };
 
-export const getSeason = (): string => {
+export const getSeason = (city: string = "New York"): string => {
     const month = new Date().getMonth() + 1;
     if (month >= 3 && month <= 5) return "spring";
     if (month >= 6 && month <= 8) return "summer";
@@ -242,20 +441,20 @@ export const getSeason = (): string => {
     return "winter";
 };
 
-export const getDayOfWeek = (): string => {
+export const getDayOfWeek = (city: string = "New York"): string => {
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     return days[new Date().getDay()];
 };
 
-export const getMonthName = (): string => {
+export const getMonthName = (city: string = "New York"): string => {
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     return months[new Date().getMonth()];
 };
 
 // Weather Functions
-export const getWeatherByTime = (): string => {
+export const getWeatherByTime = (city: string = "New York"): string => {
     const hour = new Date().getHours();
-    const season = getSeason();
+    const season = getSeason(city);
     
     if (hour >= 6 && hour <= 18) {
         if (season === "summer") return "sunny and warm";
@@ -269,9 +468,9 @@ export const getWeatherByTime = (): string => {
     }
 };
 
-export const getTemperatureRange = (): string => {
-    const season = getSeason();
-    const timeOfDay = getTimeOfDay();
+export const getTemperatureRange = (city: string = "New York"): string => {
+    const season = getSeason(city);
+    const timeOfDay = getTimeOfDay(city);
     
     if (season === "summer") return "75-85°F";
     if (season === "winter") return "30-45°F";
@@ -279,8 +478,94 @@ export const getTemperatureRange = (): string => {
     return "55-65°F";
 };
 
+
+export const getSunPosition = (city: string = "New York"): string => {
+    const hour = new Date().getHours();
+    if (hour < 6) return "below horizon";
+    if (hour < 9) return "rising in east";
+    if (hour < 12) return "high in eastern sky";
+    if (hour < 15) return "high in southern sky";
+    if (hour < 18) return "high in western sky";
+    return "setting or below horizon";
+};
+
+// Natural Environment Functions
+export const getNaturalSounds = (city: string = "New York"): string[] => {
+    const timeOfDay = getTimeOfDay(city);
+    const season = getSeason(city);
+    
+    const sounds = {
+        morning: ["birds singing", "morning breeze", "dew drops"],
+        afternoon: ["rustling leaves", "buzzing insects", "gentle wind"],
+        evening: ["crickets chirping", "evening birds", "cooling breeze"],
+        night: ["night insects", "gentle silence", "distant sounds"]
+    };
+    
+    const currentSounds = sounds[timeOfDay as keyof typeof sounds] || sounds.morning;
+    
+    if (season === "spring") currentSounds.push("blooming flowers", "baby animals");
+    if (season === "summer") currentSounds.push("cicadas", "summer storms");
+    if (season === "autumn") currentSounds.push("falling leaves", "migrating birds");
+    if (season === "winter") currentSounds.push("quiet snow", "bare branches");
+    
+    return currentSounds;
+};
+
+export const getPlantActivity = (city: string = "New York"): string => {
+    const season = getSeason(city);
+    const timeOfDay = getTimeOfDay(city);
+    
+    if (season === "spring") return "flowers blooming, trees budding";
+    if (season === "summer") return "plants growing, fruits ripening";
+    if (season === "autumn") return "leaves changing colors, seeds falling";
+    return "plants resting, roots growing";
+};
+
+// Activity Suggestion Functions
+export const getRecommendedActivities = (city: string = "New York"): string[] => {
+    const timeOfDay = getTimeOfDay(city);
+    const season = getSeason(city);
+    const weather = getWeatherByTime(city);
+    
+    const activities = [];
+    
+    // Time-based activities
+    if (timeOfDay === "morning") activities.push("stretching", "breakfast time", "morning songs");
+    if (timeOfDay === "afternoon") activities.push("playtime", "learning activities", "creative time");
+    if (timeOfDay === "evening") activities.push("story time", "quiet games", "family time");
+    
+    // Season-based activities
+    if (season === "spring") activities.push("flower spotting", "bird watching", "garden play");
+    if (season === "summer") activities.push("water play", "outdoor adventures", "picnic time");
+    if (season === "autumn") activities.push("leaf collecting", "pumpkin fun", "nature walks");
+    if (season === "winter") activities.push("indoor crafts", "cozy reading", "warm snuggles");
+    
+    return activities;
+};
+
+export const getEnergyLevel = (city: string = "New York"): string => {
+    const timeOfDay = getTimeOfDay(city);
+    const hour = new Date().getHours();
+    
+    if (hour >= 6 && hour <= 10) return "high energy";
+    if (hour >= 11 && hour <= 14) return "steady energy";
+    if (hour >= 15 && hour <= 17) return "playful energy";
+    if (hour >= 18 && hour <= 20) return "calm energy";
+    return "restful energy";
+};
+
+// Learning Optimization Functions
+export const getOptimalLearningTime = (city: string = "New York"): string => {
+    const timeOfDay = getTimeOfDay(city);
+    
+    if (timeOfDay === "morning") return "excellent for learning and focus";
+    if (timeOfDay === "afternoon") return "good for creative activities";
+    if (timeOfDay === "evening") return "better for relaxing and story time";
+    return "not an optimal learning time";
+};
+
 // Astronomical Functions
-export const getMoonPhase = (): string => {
+export const getMoonPhase = (city: string = "New York"): string => {
     const date = new Date();
     const year = date.getFullYear();
     const month = date.getMonth() + 1;
@@ -303,94 +588,9 @@ export const getMoonPhase = (): string => {
     return "waning crescent";
 };
 
-export const getSunPosition = (): string => {
-    const hour = new Date().getHours();
-    if (hour < 6) return "below horizon";
-    if (hour < 9) return "rising in east";
-    if (hour < 12) return "high in eastern sky";
-    if (hour < 15) return "high in southern sky";
-    if (hour < 18) return "high in western sky";
-    return "setting or below horizon";
-};
-
-// Natural Environment Functions
-export const getNaturalSounds = (): string[] => {
-    const timeOfDay = getTimeOfDay();
-    const season = getSeason();
-    
-    const sounds = {
-        morning: ["birds singing", "morning breeze", "dew drops"],
-        afternoon: ["rustling leaves", "buzzing insects", "gentle wind"],
-        evening: ["crickets chirping", "evening birds", "cooling breeze"],
-        night: ["night insects", "gentle silence", "distant sounds"]
-    };
-    
-    const currentSounds = sounds[timeOfDay as keyof typeof sounds] || sounds.morning;
-    
-    if (season === "spring") currentSounds.push("blooming flowers", "baby animals");
-    if (season === "summer") currentSounds.push("cicadas", "summer storms");
-    if (season === "autumn") currentSounds.push("falling leaves", "migrating birds");
-    if (season === "winter") currentSounds.push("quiet snow", "bare branches");
-    
-    return currentSounds;
-};
-
-export const getPlantActivity = (): string => {
-    const season = getSeason();
-    const timeOfDay = getTimeOfDay();
-    
-    if (season === "spring") return "flowers blooming, trees budding";
-    if (season === "summer") return "plants growing, fruits ripening";
-    if (season === "autumn") return "leaves changing colors, seeds falling";
-    return "plants resting, roots growing";
-};
-
-// Activity Suggestion Functions
-export const getRecommendedActivities = (): string[] => {
-    const timeOfDay = getTimeOfDay();
-    const season = getSeason();
-    const weather = getWeatherByTime();
-    
-    const activities = [];
-    
-    // Time-based activities
-    if (timeOfDay === "morning") activities.push("stretching", "breakfast time", "morning songs");
-    if (timeOfDay === "afternoon") activities.push("playtime", "learning activities", "creative time");
-    if (timeOfDay === "evening") activities.push("story time", "quiet games", "family time");
-    
-    // Season-based activities
-    if (season === "spring") activities.push("flower spotting", "bird watching", "garden play");
-    if (season === "summer") activities.push("water play", "outdoor adventures", "picnic time");
-    if (season === "autumn") activities.push("leaf collecting", "pumpkin fun", "nature walks");
-    if (season === "winter") activities.push("indoor crafts", "cozy reading", "warm snuggles");
-    
-    return activities;
-};
-
-export const getEnergyLevel = (): string => {
-    const timeOfDay = getTimeOfDay();
-    const hour = new Date().getHours();
-    
-    if (hour >= 6 && hour <= 10) return "high energy";
-    if (hour >= 11 && hour <= 14) return "steady energy";
-    if (hour >= 15 && hour <= 17) return "playful energy";
-    if (hour >= 18 && hour <= 20) return "calm energy";
-    return "restful energy";
-};
-
-// Learning Optimization Functions
-export const getOptimalLearningTime = (): string => {
-    const hour = new Date().getHours();
-    
-    if (hour >= 8 && hour <= 10) return "excellent for new learning";
-    if (hour >= 14 && hour <= 16) return "good for creative activities";
-    if (hour >= 19 && hour <= 20) return "perfect for story time";
-    return "good for gentle learning";
-};
-
-export const getChildMoodPrediction = (): string => {
-    const timeOfDay = getTimeOfDay();
-    const energyLevel = getEnergyLevel();
+export const getChildMoodPrediction = (city: string = "New York"): string => {
+    const timeOfDay = getTimeOfDay(city);
+    const energyLevel = getEnergyLevel(city);
     
     if (energyLevel === "high energy") return "curious and ready to explore";
     if (energyLevel === "steady energy") return "focused and attentive";
@@ -400,9 +600,9 @@ export const getChildMoodPrediction = (): string => {
 };
 
 // Environmental Safety Functions
-export const getSafetyReminders = (): string[] => {
-    const timeOfDay = getTimeOfDay();
-    const season = getSeason();
+export const getSafetyReminders = (city: string = "New York"): string[] => {
+    const timeOfDay = getTimeOfDay(city);
+    const season = getSeason(city);
     
     const reminders = [];
     
@@ -415,9 +615,9 @@ export const getSafetyReminders = (): string[] => {
     return reminders;
 };
 
-export const getComfortIndicators = (): string[] => {
-    const timeOfDay = getTimeOfDay();
-    const season = getSeason();
+export const getComfortIndicators = (city: string = "New York"): string[] => {
+    const timeOfDay = getTimeOfDay(city);
+    const season = getSeason(city);
     
     const indicators = [];
     
@@ -431,44 +631,44 @@ export const getComfortIndicators = (): string[] => {
 };
 
 // Main Environment Awareness Aggregator
-export const getEnvironmentAwareness = (): Record<string, any> => {
+export const getEnvironmentAwareness = (city: string = "New York"): Record<string, any> => {
     return {
         // Basic time and date
         currentTime: getCurrentTime().toLocaleString(),
-        timeOfDay: getTimeOfDay(),
-        dayOfWeek: getDayOfWeek(),
-        month: getMonthName(),
-        season: getSeason(),
+        timeOfDay: getTimeOfDay(city),
+        dayOfWeek: getDayOfWeek(city),
+        month: getMonthName(city),
+        season: getSeason(city),
         
         // Weather and temperature
-        weather: getWeatherByTime(),
-        temperatureRange: getTemperatureRange(),
+        weather: getWeatherByTime(city),
+        temperatureRange: getTemperatureRange(city),
         
         // Astronomical
-        moonPhase: getMoonPhase(),
-        sunPosition: getSunPosition(),
+        moonPhase: getMoonPhase(city),
+        sunPosition: getSunPosition(city),
         
         // Natural environment
-        naturalSounds: getNaturalSounds(),
-        plantActivity: getPlantActivity(),
+        naturalSounds: getNaturalSounds(city),
+        plantActivity: getPlantActivity(city),
         
         // Activity and energy
-        recommendedActivities: getRecommendedActivities(),
-        energyLevel: getEnergyLevel(),
-        optimalLearningTime: getOptimalLearningTime(),
+        recommendedActivities: getRecommendedActivities(city),
+        energyLevel: getEnergyLevel(city),
+        optimalLearningTime: getOptimalLearningTime(city),
         
         // Child-specific predictions
-        predictedChildMood: getChildMoodPrediction(),
+        predictedChildMood: getChildMoodPrediction(city),
         
         // Safety and comfort
-        safetyReminders: getSafetyReminders(),
-        comfortIndicators: getComfortIndicators()
+        safetyReminders: getSafetyReminders(city),
+        comfortIndicators: getComfortIndicators(city)
     };
 };
 
-// Generate comprehensive environment-aware prompt
-export const generateEnvironmentAwarePrompt = (): string => {
-    const env = getEnvironmentAwareness();
+
+export const generateEnvironmentAwarePrompt = (city: string = "New York"): string => {
+    const env = getEnvironmentAwareness(city);
     
     return `
 # Current Environmental Context
@@ -481,29 +681,52 @@ You are aware of the following environmental factors that can enhance your inter
 - **Month**: ${env.month}
 - **Season**: ${env.season}
 
-## Weather and Nature
-- **Weather**: ${env.weather}
-- **Temperature Range**: ${env.temperatureRange}
-- **Moon Phase**: ${env.moonPhase}
-- **Sun Position**: ${env.sunPosition}
-- **Natural Sounds**: ${env.naturalSounds.join(", ")}
-- **Plant Activity**: ${env.plantActivity}
-
-## Activity and Energy
-- **Recommended Activities**: ${env.recommendedActivities.join(", ")}
-- **Energy Level**: ${env.energyLevel}
-- **Optimal Learning Time**: ${env.optimalLearningTime}
-
-## Child Mood Prediction
-- **Predicted Child Mood**: ${env.predictedChildMood}
-
-## Safety and Comfort
-- **Safety Reminders**: ${env.safetyReminders.join(", ")}
-- **Comfort Indicators**: ${env.comfortIndicators.join(", ")}
-
 Use this environmental context to make your responses more relevant and engaging. Reference the time of day, weather, season, and suggested activities naturally in your conversation with the child.
+
+It is important to note that these external cues should only serve as a reference. Avoid incorporating them into conversations, especially with children aged 1-2 years old, as they do not need to focus on excessive environmental information. Such cues are too abstract and sensory for young children to comprehend.
 `;
 };
+
+// Generate comprehensive environment-aware prompt
+// export const generateEnvironmentAwarePrompt = (city: string = "New York"): string => {
+//     const env = getEnvironmentAwareness(city);
+    
+//     return `
+// # Current Environmental Context
+// You are aware of the following environmental factors that can enhance your interaction with the child:
+
+// ## Time and Season Context
+// - **Current Time**: ${env.currentTime}
+// - **Time of Day**: ${env.timeOfDay}
+// - **Day of Week**: ${env.dayOfWeek}
+// - **Month**: ${env.month}
+// - **Season**: ${env.season}
+
+// ## Weather and Nature
+// - **Weather**: ${env.weather}
+// - **Temperature Range**: ${env.temperatureRange}
+// - **Moon Phase**: ${env.moonPhase}
+// - **Sun Position**: ${env.sunPosition}
+// - **Natural Sounds**: ${env.naturalSounds.join(", ")}
+// - **Plant Activity**: ${env.plantActivity}
+
+// ## Activity and Energy
+// - **Recommended Activities**: ${env.recommendedActivities.join(", ")}
+// - **Energy Level**: ${env.energyLevel}
+// - **Optimal Learning Time**: ${env.optimalLearningTime}
+
+// ## Child Mood Prediction
+// - **Predicted Child Mood**: ${env.predictedChildMood}
+
+// ## Safety and Comfort
+// - **Safety Reminders**: ${env.safetyReminders.join(", ")}
+// - **Comfort Indicators**: ${env.comfortIndicators.join(", ")}
+
+// Use this environmental context to make your responses more relevant and engaging. Reference the time of day, weather, season, and suggested activities naturally in your conversation with the child.
+
+// It is important to note that these external cues should only serve as a reference. Avoid incorporating them into conversations, especially with children aged 1-2 years old, as they do not need to focus on excessive environmental information. Such cues are too abstract and sensory for young children to comprehend.
+// `;
+// };
 
 // 获取完整的系统提示词（包含儿童信息）
 export const getFullSystemPrompt = (childProfile: any): string => {
@@ -515,8 +738,12 @@ export const getFullSystemPrompt = (childProfile: any): string => {
     const levelContent = generateLevelDescription(normalizedLanguageLevel);
     console.log("levelContent: ", levelContent);
 
-    // Add environment awareness to the system prompt
-    const environmentContext = generateEnvironmentAwarePrompt();
+    // Get city from child profile or use default
+    const city = childProfile.city || childProfile.location || "New York";
+    
+    // Add environment awareness to the system prompt with city information
+    const environmentContext = generateEnvironmentAwarePrompt(city);
+    // const environmentContext = "    ";
 
     return environmentContext + currentSystemPromptTemplate
         .replace("{{childName}}", childProfile.name || childProfile.id)
